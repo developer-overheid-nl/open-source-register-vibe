@@ -1,0 +1,16 @@
+.empty-state {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.empty-state__message {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: var(--color-text);
+}
+
+.empty-state__hint {
+  margin: 0;
+}

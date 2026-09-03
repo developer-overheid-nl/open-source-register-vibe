@@ -1,0 +1,29 @@
+.dependency-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.dependency-list__empty {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.dependency-row {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 8rem;
+}
+
+.dependency-row__ecosystem {
+  font-weight: 600;
+}
+
+.dependency-row__count {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}

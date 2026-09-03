@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Open Source Catalogus</title>
+  <link rel="stylesheet" href="styles/base.css" />
+  <link rel="stylesheet" href="components/search-bar.css" />
+  <link rel="stylesheet" href="components/tag-filter.css" />
+  <link rel="stylesheet" href="components/checkbox-filter.css" />
+  <link rel="stylesheet" href="components/project-card.css" />
+  <link rel="stylesheet" href="components/project-list.css" />
+  <link rel="stylesheet" href="components/empty-state.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html">
+      <p class="site-header__title">Open Source Catalogus</p>
+      <p class="site-header__subtitle">Open source projecten van de Nederlandse overheid</p>
+    </a>
+  </header>
+
+  <main class="page">
+    <div class="catalog-layout">
+      <aside class="catalog-layout__filters" id="filters"></aside>
+      <div class="catalog-layout__results">
+        <div id="search-bar"></div>
+        <div id="project-list"></div>
+      </div>
+    </div>
+  </main>
+
+  <template id="tpl-search-bar">
+    <div class="search-bar">
+      <label class="search-bar__label" for="search-bar-input">Zoeken</label>
+      <input
+        type="search"
+        id="search-bar-input"
+        class="search-bar__input"
+        placeholder="Zoek op naam, beschrijving of tag…"
+        autocomplete="off"
+      />
+    </div>
+  </template>
+
+  <template id="tpl-filters">
+    <div class="filters">
+      <section class="filters__section">
+        <h2 class="filters__heading">Tags</h2>
+        <div class="filters__active-tags" id="active-tag-pills"></div>
+        <div class="tag-filter" id="tag-filter-list"></div>
+      </section>
+      <section class="filters__section">
+        <h2 class="filters__heading">Ontwikkelstatus</h2>
+        <div class="checkbox-filter" id="status-filter-options"></div>
+      </section>
+      <section class="filters__section">
+        <h2 class="filters__heading">Organisatie</h2>
+        <div class="checkbox-filter" id="org-filter-options"></div>
+      </section>
+      <section class="filters__section">
+        <h2 class="filters__heading">Softwaretype</h2>
+        <div class="checkbox-filter" id="software-type-filter-options"></div>
+      </section>
+    </div>
+  </template>
+
+  <template id="tpl-tag-pill">
+    <button type="button" class="tag-pill">
+      <span class="tag-pill__label"></span>
+      <span class="tag-pill__remove" aria-hidden="true">×</span>
+    </button>
+  </template>
+
+  <template id="tpl-tag-chip">
+    <button type="button" class="tag-chip">
+      <span class="tag-chip__label"></span>
+    </button>
+  </template>
+
+  <template id="tpl-checkbox-option">
+    <label class="checkbox-filter__option">
+      <input type="checkbox" class="checkbox-filter__checkbox" />
+      <span class="checkbox-filter__label"></span>
+    </label>
+  </template>
+
+  <template id="tpl-project-card">
+    <li class="project-card">
+      <a class="project-card__link" href="#">
+        <div class="project-card__header">
+          <h2 class="project-card__name"></h2>
+          <span class="project-card__warning badge" hidden title="Geen publiccode.yml gevonden">
+            ⚠ metadata onvolledig
+          </span>
+        </div>
+        <p class="project-card__org"></p>
+        <p class="project-card__description"></p>
+        <div class="project-card__tags"></div>
+        <dl class="project-card__meta">
+          <div>
+            <dt>Status</dt>
+            <dd class="project-card__status"></dd>
+          </div>
+          <div>
+            <dt>Taal</dt>
+            <dd class="project-card__language"></dd>
+          </div>
+        </dl>
+      </a>
+    </li>
+  </template>
+
+  <template id="tpl-empty-state">
+    <div class="empty-state">
+      <p class="empty-state__message">Geen projecten gevonden.</p>
+      <p class="empty-state__hint">Probeer een andere zoekterm of pas de actieve filters aan.</p>
+    </div>
+  </template>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

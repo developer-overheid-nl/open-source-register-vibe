@@ -1,0 +1,137 @@
+:root {
+  --color-primary: #154273;
+  --color-primary-dark: #0e2f52;
+  --color-accent: #007bc7;
+  --color-text: #1c1c1c;
+  --color-text-muted: #5a5a5a;
+  --color-bg: #ffffff;
+  --color-bg-subtle: #f4f6f8;
+  --color-border: #d7dde3;
+  --color-warning-bg: #fdf3d0;
+  --color-warning-border: #dba617;
+  --color-warning-text: #6b4e00;
+  --radius: 4px;
+  --font-sans: "Segoe UI", Roboto, Arial, sans-serif;
+  --heat-0: #e8edf2;
+  --heat-1: #bcdcf2;
+  --heat-2: #7ab8e6;
+  --heat-3: #2f8fd1;
+  --heat-4: #154273;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+.site-header {
+  background: var(--color-primary);
+  color: #fff;
+  padding: 1rem 1.5rem;
+}
+
+.site-header a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.site-header__title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.site-header__subtitle {
+  margin: 0.15rem 0 0;
+  font-size: 0.9rem;
+  color: #cfe0f2;
+}
+
+.page {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1rem;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-primary);
+}
+
+.catalog-layout {
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 45rem) {
+  .catalog-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filters {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.filters__section + .filters__section {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.filters__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
