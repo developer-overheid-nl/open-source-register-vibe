@@ -297,6 +297,30 @@ en/of onderhoudt, en snel projecten van een specifieke organisatie kan vinden.
   (checkboxes, OF-logica binnen dit filter), naar hetzelfde patroon als het
   ontwikkelstatus-filter.
 
+## Laatste releases
+
+**User story**
+Als gebruiker van de catalogus wil ik op de detailpagina van een project de
+laatste 3 releases zien, zodat ik weet welke versies recent zijn uitgebracht en
+hoe actief het project releasematig is.
+
+**Acceptatiecriteria**
+- Gegeven de detailpagina van een project, worden de laatste 3 releases van het
+  project getoond (bijv. versienummer/tag en releasedatum).
+- Gegeven een project geen releases heeft, toont de detailpagina duidelijk dat
+  er geen releases zijn, in plaats van een lege of misleidende sectie.
+
+**Notities / open vragen**
+- Bron: waarschijnlijk GitHub's releases-API
+  (`/repos/{owner}/{repo}/releases`), naar hetzelfde patroon als andere
+  GitHub-gebaseerde features in deze catalogus (zie
+  [ARCHITECTURE.md](./ARCHITECTURE.md)) — nog niet besloten of dit tijdens
+  ingest-tijd wordt opgehaald of live.
+- Nog niet besloten: wat te tonen bij een project zonder GitHub-releases maar
+  wel met git-tags, en of release-notes/changelog-tekst wordt meegenomen of
+  alleen versie + datum.
+- Deze feature is nog niet gebouwd.
+
 ## Contactinformatie
 
 **User story**
