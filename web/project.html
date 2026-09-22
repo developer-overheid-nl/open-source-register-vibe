@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="styles/base.css" />
   <link rel="stylesheet" href="components/tag-filter.css" />
   <link rel="stylesheet" href="components/project-detail.css" />
+  <link rel="stylesheet" href="components/software-type-badge.css" />
   <link rel="stylesheet" href="components/activity-panel.css" />
   <link rel="stylesheet" href="components/avatar-stack.css" />
   <link rel="stylesheet" href="components/commit-graph.css" />
@@ -127,6 +128,17 @@
       <span class="dependency-row__ecosystem"></span>
       <span class="dependency-row__count"></span>
     </div>
+  </template>
+
+  <template id="tpl-dependency-top-row">
+    <li class="dependency-top-row">
+      <div class="dependency-top-row__main">
+        <span class="dependency-top-row__name"></span>
+        <span class="dependency-top-row__ecosystem"></span>
+      </div>
+      <span class="dependency-top-row__count"></span>
+      <div class="dependency-top-row__bar"><span class="dependency-top-row__bar-fill"></span></div>
+    </li>
   </template>
 
   <template id="tpl-language-tag">

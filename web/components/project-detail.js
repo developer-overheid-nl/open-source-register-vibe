@@ -3,6 +3,7 @@ import { renderCommitGraph } from "./commit-graph.js";
 import { renderContactList } from "./contact-list.js";
 import { renderDependencyList } from "./dependency-list.js";
 import { renderLanguageList } from "./language-list.js";
+import { renderSoftwareTypeBadge } from "./software-type-badge.js";
 
 /** Renders the full project detail page into `container`. */
 export function renderProjectDetail(container, project) {
@@ -21,8 +22,7 @@ export function renderProjectDetail(container, project) {
   node.querySelector(".project-detail__description").textContent =
     project.longDescription || project.description || "";
 
-  node.querySelector(".project-detail__software-type").textContent =
-    project.softwareType || "onbekend";
+  renderSoftwareTypeBadge(node.querySelector(".project-detail__software-type"), project.softwareType);
   node.querySelector(".project-detail__license").textContent = project.license || "onbekend";
   node.querySelector(".project-detail__org-fact").textContent = project.org || "onbekend";
 

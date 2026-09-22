@@ -13,6 +13,24 @@
   - https://github.com/MinBZK/MijnOverheidZakelijk
   - https://github.com/minvws/gfmodules-nationale-verwijsindex
   - https://github.com/developer-overheid-nl/don-infra.git
+  - https://github.com/MinBZK/regelrecht
+  - https://github.com/MinBZK/nl-wallet
+  - https://github.com/kadaster/generieke-geo-componenten
+  - https://github.com/Geonovum/ogc-checker
+  - https://github.com/Signalen/frontend
+  - https://github.com/RIVM-bioinformatics/Pacini-typing
+  - https://github.com/Sudwest-Fryslan/OpenZaakBrug
+  - https://github.com/belastingdienst/opr-paas
+  - https://github.com/belastingdienst/opr-paas-cli
+  - https://github.com/TNO/knowledge-engine
+  - https://github.com/nl-design-system/candidate
+  - https://github.com/nl-design-system/documentatie
+  - https://github.com/Amsterdam/meldingen-frontend
+  - https://github.com/Amsterdam/openstad-headless
+  - https://github.com/Amsterdam/meldingen
+  - https://github.com/GemeenteNijmegen/design-system
+  - https://github.com/GemeenteNijmegen/mijn-nijmegen
+  - https://github.com/GemeenteNijmegen/mule-infra
 - **Metadatastandaard**: projectmetadata volgt de
   [publiccode.yml](https://yml.publiccode.tools/) standaard.
   - Schema: https://yml.publiccode.tools/v0/schema.core.html

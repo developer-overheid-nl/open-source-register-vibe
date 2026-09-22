@@ -73,3 +73,16 @@
 .project-card__meta dd {
   margin: 0;
 }
+
+.project-card__language {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.project-card__language-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}

@@ -1,12 +1,12 @@
-.dependency-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
 .dependency-list__empty {
   color: var(--color-text-muted);
   margin: 0;
+}
+
+.dependency-list__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .dependency-row {
@@ -26,4 +26,82 @@
 .dependency-row__count {
   font-size: 0.85rem;
   color: var(--color-text-muted);
+}
+
+.dependency-list__top {
+  margin-top: 1.25rem;
+}
+
+.dependency-list__top-heading {
+  font-size: 0.95rem;
+  margin: 0 0 0.25rem;
+}
+
+.dependency-list__top-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.6rem;
+}
+
+.dependency-list__top-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dependency-top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.3rem;
+}
+
+.dependency-top-row__main {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.dependency-top-row__name {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dependency-top-row__ecosystem {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+.dependency-top-row__count {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.dependency-top-row__bar {
+  grid-column: 1 / -1;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  overflow: hidden;
+}
+
+.dependency-top-row__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: inherit;
 }

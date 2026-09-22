@@ -1,4 +1,5 @@
 import { mountSearchBar } from "./components/search-bar.js";
+import { mountSortSelect } from "./components/sort-select.js";
 import { mountTagFilter } from "./components/tag-filter.js";
 import { mountCheckboxFilter } from "./components/checkbox-filter.js";
 import { renderProjectList } from "./components/project-list.js";
@@ -10,6 +11,7 @@ const state = {
   activeStatuses: new Set(),
   activeOrgs: new Set(),
   activeSoftwareTypes: new Set(),
+  sort: "name-asc",
 };
 
 let tagFilterHandle = null;
@@ -34,6 +36,14 @@ async function init() {
     },
   });
 
+  mountSortSelect(document.getElementById("sort-select"), {
+    value: state.sort,
+    onChange: (sort) => {
+      state.sort = sort;
+      render();
+    },
+  });
+
   render();
 }
 
@@ -42,7 +52,15 @@ function mountFilters() {
   const template = document.getElementById("tpl-filters");
   filtersContainer.appendChild(template.content.cloneNode(true));
 
-  const allTags = [...new Set(state.projects.flatMap((p) => p.tags || []))].sort();
+  const tagCounts = {};
+  for (const project of state.projects) {
+    for (const tag of project.tags || []) {
+      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    }
+  }
+  const allTags = Object.keys(tagCounts).sort(
+    (a, b) => tagCounts[b] - tagCounts[a] || a.localeCompare(b)
+  );
   const allStatuses = [
     ...new Set(state.projects.map((p) => p.developmentStatus).filter(Boolean)),
   ].sort();
@@ -56,6 +74,7 @@ function mountFilters() {
     document.getElementById("active-tag-pills"),
     {
       tags: allTags,
+      counts: tagCounts,
       isActive: (tag) => state.activeTags.has(tag),
       onToggle: (tag) => toggleTag(tag),
     }
@@ -139,6 +158,19 @@ function matchesSoftwareType(project) {
   return state.activeSoftwareTypes.has(project.softwareType);
 }
 
+/** Total commits over the last 12 months, or 0 if no commit activity is known. */
+function totalCommits(project) {
+  const days = project.commitActivity?.available ? project.commitActivity.days : null;
+  if (!days) return 0;
+  return days.reduce((sum, day) => sum + day.count, 0);
+}
+
+const SORTERS = {
+  "name-asc": (a, b) => a.name.localeCompare(b.name),
+  "commits-desc": (a, b) => totalCommits(b) - totalCommits(a) || a.name.localeCompare(b.name),
+  "commits-asc": (a, b) => totalCommits(a) - totalCommits(b) || a.name.localeCompare(b.name),
+};
+
 function render() {
   tagFilterHandle?.update();
 
@@ -151,7 +183,7 @@ function render() {
         matchesOrg(project) &&
         matchesSoftwareType(project)
     )
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(SORTERS[state.sort] || SORTERS["name-asc"]);
 
   renderProjectList(document.getElementById("project-list"), filtered, {
     onTagClick: (tag) => toggleTag(tag),

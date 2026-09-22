@@ -26,6 +26,37 @@
   color: #fff;
 }
 
+.tag-chip__count {
+  margin-left: 0.35rem;
+  color: var(--color-text-muted);
+}
+
+.tag-chip__count:empty {
+  display: none;
+}
+
+.tag-chip--active .tag-chip__count {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.tag-filter__toggle {
+  flex-basis: 100%;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  margin-top: 0.1rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-filter__toggle:hover {
+  text-decoration: underline;
+}
+
 .filters__active-tags {
   display: flex;
   flex-wrap: wrap;

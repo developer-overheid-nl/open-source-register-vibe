@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::process::Command;
 
 /// (owner, repo, hardcoded organisation name — publiccode.yml files in this
@@ -50,10 +50,43 @@ const REPOS: &[(&str, &str, &str)] = &[
         "don-infra",
         "Developer overheid NL",
     ),
+    (
+        "MinBZK",
+        "regelrecht",
+        "Ministerie van Binnenlandse Zaken en Koninkrijksrelaties",
+    ),
+    (
+        "MinBZK",
+        "nl-wallet",
+        "Ministerie van Binnenlandse Zaken en Koninkrijksrelaties",
+    ),
+    ("kadaster", "generieke-geo-componenten", "Kadaster"),
+    ("Geonovum", "ogc-checker", "Geonovum"),
+    ("Signalen", "frontend", "Signalen"),
+    ("RIVM-bioinformatics", "Pacini-typing", "RIVM"),
+    (
+        "Sudwest-Fryslan",
+        "OpenZaakBrug",
+        "Gemeente Súdwest-Fryslân",
+    ),
+    ("belastingdienst", "opr-paas", "Belastingdienst"),
+    ("belastingdienst", "opr-paas-cli", "Belastingdienst"),
+    (
+        "nl-design-system",
+        "candidate",
+        "NL Design System (community)",
+    ),
+    (
+        "nl-design-system",
+        "documentatie",
+        "NL Design System (community)",
+    ),
 ];
 
 #[derive(Debug, Deserialize, Default)]
 struct PubliccodeYml {
+    #[serde(default)]
+    name: Option<String>,
     #[serde(rename = "softwareType", default)]
     software_type: Option<String>,
     #[serde(rename = "developmentStatus", default)]
@@ -322,49 +355,173 @@ fn purl_ecosystem(purl: &str) -> Option<String> {
     Some(ecosystem.to_string())
 }
 
+const TOP_DEPENDENCIES_LIMIT: usize = 20;
+
+struct SbomPackage {
+    name: String,
+    version: Option<String>,
+    ecosystem: Option<String>,
+}
+
+fn empty_dependencies() -> Value {
+    json!({
+        "available": false,
+        "packageManagers": [],
+        "topDependencies": [],
+        "directDependencyCount": 0,
+    })
+}
+
+/// Fetches the repo's SBOM and returns per-ecosystem totals plus, for each
+/// first-level (direct) dependency, how many other packages it transitively
+/// pulls in — computed by walking the SBOM's `DEPENDS_ON` graph from the
+/// package the repo's document `DESCRIBES`, so heavy first-level deps stand
+/// out. Only the top `TOP_DEPENDENCIES_LIMIT` (by transitive count) are
+/// returned; `directDependencyCount` carries the true total.
 fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>, owner: &str, repo: &str) -> Value {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/dependency-graph/sbom");
     let (status, body) = match api_get(client, token, &url) {
         Ok(v) => v,
-        Err(_) => return json!({ "available": false, "packageManagers": [] }),
+        Err(_) => return empty_dependencies(),
     };
     if status != 200 {
-        return json!({ "available": false, "packageManagers": [] });
+        return empty_dependencies();
     }
-    let packages = body
-        .pointer("/sbom/packages")
+
+    let sbom = body.get("sbom").cloned().unwrap_or(Value::Null);
+    let packages = sbom
+        .get("packages")
         .and_then(|v| v.as_array())
         .cloned()
         .unwrap_or_default();
+    let relationships = sbom
+        .get("relationships")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let doc_id = sbom
+        .get("SPDXID")
+        .and_then(|v| v.as_str())
+        .unwrap_or("SPDXRef-DOCUMENT");
 
-    let mut counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut pkg_by_id: BTreeMap<String, SbomPackage> = BTreeMap::new();
+    let mut ecosystem_counts: BTreeMap<String, u32> = BTreeMap::new();
+
     for pkg in &packages {
-        let refs = match pkg.get("externalRefs").and_then(|v| v.as_array()) {
-            Some(r) => r,
+        let id = match pkg.get("SPDXID").and_then(|v| v.as_str()) {
+            Some(s) => s.to_string(),
             None => continue,
         };
-        for r in refs {
-            if r.get("referenceCategory").and_then(|v| v.as_str()) != Some("PACKAGE-MANAGER") {
-                continue;
-            }
-            if let Some(locator) = r.get("referenceLocator").and_then(|v| v.as_str()) {
-                if let Some(eco) = purl_ecosystem(locator) {
-                    *counts.entry(eco).or_insert(0) += 1;
-                }
-            }
+        let name = pkg
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&id)
+            .to_string();
+        let version = pkg
+            .get("versionInfo")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let ecosystem = pkg
+            .get("externalRefs")
+            .and_then(|v| v.as_array())
+            .and_then(|refs| {
+                refs.iter().find_map(|r| {
+                    if r.get("referenceCategory").and_then(|v| v.as_str()) != Some("PACKAGE-MANAGER") {
+                        return None;
+                    }
+                    r.get("referenceLocator")
+                        .and_then(|v| v.as_str())
+                        .and_then(purl_ecosystem)
+                })
+            });
+        if let Some(eco) = &ecosystem {
+            *ecosystem_counts.entry(eco.clone()).or_insert(0) += 1;
         }
+        pkg_by_id.insert(id, SbomPackage { name, version, ecosystem });
     }
 
-    if counts.is_empty() {
-        return json!({ "available": false, "packageManagers": [] });
+    if pkg_by_id.is_empty() {
+        return empty_dependencies();
     }
 
-    let package_managers: Vec<Value> = counts
+    let package_managers: Vec<Value> = ecosystem_counts
         .into_iter()
         .map(|(ecosystem, count)| json!({ "ecosystem": ecosystem, "count": count }))
         .collect();
 
-    json!({ "available": true, "packageManagers": package_managers })
+    // pkg id -> ids it directly DEPENDS_ON (root included, keyed by doc_id's DESCRIBES target).
+    let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut root_id: Option<String> = None;
+    for rel in &relationships {
+        let from = rel.get("spdxElementId").and_then(|v| v.as_str());
+        let to = rel.get("relatedSpdxElement").and_then(|v| v.as_str());
+        let rtype = rel.get("relationshipType").and_then(|v| v.as_str());
+        match (from, to, rtype) {
+            (Some(f), Some(t), Some("DESCRIBES")) if f == doc_id => {
+                root_id = Some(t.to_string());
+            }
+            (Some(f), Some(t), Some("DEPENDS_ON")) => {
+                children.entry(f.to_string()).or_default().push(t.to_string());
+            }
+            _ => {}
+        }
+    }
+
+    let Some(root_id) = root_id else {
+        return json!({
+            "available": true,
+            "packageManagers": package_managers,
+            "topDependencies": [],
+            "directDependencyCount": 0,
+        });
+    };
+
+    let direct_ids = children.get(&root_id).cloned().unwrap_or_default();
+
+    let mut top: Vec<(&String, u32)> = direct_ids
+        .iter()
+        .map(|id| {
+            // BFS over package->package DEPENDS_ON edges (not the root's own
+            // edges) to count everything this direct dependency pulls in.
+            let mut visited: HashSet<&str> = HashSet::new();
+            visited.insert(id.as_str());
+            let mut queue: VecDeque<&str> = VecDeque::new();
+            queue.push_back(id.as_str());
+            while let Some(current) = queue.pop_front() {
+                if let Some(kids) = children.get(current) {
+                    for kid in kids {
+                        if visited.insert(kid.as_str()) {
+                            queue.push_back(kid.as_str());
+                        }
+                    }
+                }
+            }
+            (id, (visited.len() - 1) as u32)
+        })
+        .collect();
+    top.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+
+    let top_dependencies: Vec<Value> = top
+        .into_iter()
+        .take(TOP_DEPENDENCIES_LIMIT)
+        .filter_map(|(id, transitive_count)| {
+            pkg_by_id.get(id).map(|p| {
+                json!({
+                    "name": p.name,
+                    "version": p.version,
+                    "ecosystem": p.ecosystem,
+                    "transitiveCount": transitive_count,
+                })
+            })
+        })
+        .collect();
+
+    json!({
+        "available": true,
+        "packageManagers": package_managers,
+        "topDependencies": top_dependencies,
+        "directDependencyCount": direct_ids.len(),
+    })
 }
 
 fn main() {
@@ -419,6 +576,17 @@ fn main() {
         let publiccode = fetch_publiccode(&client, owner, repo, &default_branch);
         let has_publiccode = publiccode.is_some();
 
+        let github_name = repo_info
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(repo)
+            .to_string();
+        let name = publiccode
+            .as_ref()
+            .and_then(|p| p.name.clone())
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or(github_name);
+
         let (short_description, long_description) = publiccode
             .as_ref()
             .and_then(|p| p.description.get("nl").or_else(|| p.description.get("en")))
@@ -472,7 +640,7 @@ fn main() {
 
         projects.push(json!({
             "slug": repo,
-            "name": repo_info.get("name").and_then(|v| v.as_str()).unwrap_or(repo),
+            "name": name,
             "org": org_fallback,
             "repoUrl": repo_html_url,
             "description": description,
