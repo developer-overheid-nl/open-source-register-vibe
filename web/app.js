@@ -165,10 +165,36 @@ function totalCommits(project) {
   return days.reduce((sum, day) => sum + day.count, 0);
 }
 
+/** All-time unique contributor count, from the union of the activity buckets. */
+function allTimeContributors(project) {
+  const buckets = ["last6Months", "months6to12", "olderThan12Months"];
+  const logins = new Set();
+  for (const bucket of buckets) {
+    for (const c of project.activity?.[bucket]?.contributors || []) {
+      logins.add(c.login);
+    }
+  }
+  return logins.size;
+}
+
+/** Total dependency count across all package managers, or 0 if unknown. */
+function totalDependencies(project) {
+  if (!project.dependencies?.available) return 0;
+  return project.dependencies.packageManagers.reduce((sum, pm) => sum + pm.count, 0);
+}
+
 const SORTERS = {
   "name-asc": (a, b) => a.name.localeCompare(b.name),
   "commits-desc": (a, b) => totalCommits(b) - totalCommits(a) || a.name.localeCompare(b.name),
   "commits-asc": (a, b) => totalCommits(a) - totalCommits(b) || a.name.localeCompare(b.name),
+  "contributors-desc": (a, b) =>
+    allTimeContributors(b) - allTimeContributors(a) || a.name.localeCompare(b.name),
+  "contributors-asc": (a, b) =>
+    allTimeContributors(a) - allTimeContributors(b) || a.name.localeCompare(b.name),
+  "dependencies-desc": (a, b) =>
+    totalDependencies(b) - totalDependencies(a) || a.name.localeCompare(b.name),
+  "dependencies-asc": (a, b) =>
+    totalDependencies(a) - totalDependencies(b) || a.name.localeCompare(b.name),
 };
 
 function render() {
