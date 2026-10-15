@@ -31,6 +31,44 @@
   - https://github.com/GemeenteNijmegen/design-system
   - https://github.com/GemeenteNijmegen/mijn-nijmegen
   - https://github.com/GemeenteNijmegen/mule-infra
+  - https://github.com/wigo4it/nl-app
+  - https://github.com/wigo4it/techradar
+  - https://github.com/wigo4it/kwartaalmeeting
+  - https://github.com/wigo4it/knowledge-sharing-jp
+  - https://github.com/wigo4it/kerstbingo
+  - https://github.com/wigo4it/duurzaamheidsradar
+  - https://github.com/wigo4it/DevStream
+  - https://github.com/wigo4it/github-action-azure-devops-pipeline-runner
+  - https://github.com/wigo4it/module-tf-azure-aks
+  - https://github.com/wigo4it/platform-infra-talos-endpoints
+  - https://github.com/wigo4it/wigo4it-code-conventions-mcp
+  - https://github.com/wigo4it/wigo4it-multitenant
+  - https://github.com/wigo4it/gitops-core-infra
+  - https://github.com/wigo4it/POC-Socrates-PDF-Vergelijker
+  - https://github.com/wigo4it/wigo4it-brandbook
+  - https://github.com/wigo4it/renovate-config
+  - https://github.com/wigo4it/azure-jwks-publisher
+  - https://github.com/wigo4it/modules-tf-leafcloud
+  - https://github.com/wigo4it/w4u-api-test-client
+  - https://github.com/wigo4it/jwks-publisher-w4
+  - https://github.com/kadaster/imbag
+  - https://github.com/kadaster/imkad
+  - https://github.com/kadaster/imbrt
+  - https://github.com/kadaster/top10nl
+  - https://github.com/kadaster/top50nl
+  - https://github.com/kadaster/top250nl
+  - https://github.com/kadaster/brt-algemeen
+  - https://github.com/kadaster/klic-win
+  - https://github.com/kadaster/top100nl
+  - https://github.com/kadaster/top500nl
+  - https://github.com/kadaster/vgl
+  - https://github.com/kadaster/top1000nl
+  - https://github.com/kadaster/metagegevens-voorbeelden
+  - https://github.com/kadaster/BRK-bevragen
+  - https://github.com/kadaster/bag-leveranciers
+  - https://github.com/kadaster/WOZ-bevragen
+  - https://github.com/kadaster/eurogeographics-erm-validator
+  - https://github.com/kadaster/ladm-composer
 - **Metadatastandaard**: projectmetadata volgt de
   [publiccode.yml](https://yml.publiccode.tools/) standaard.
   - Schema: https://yml.publiccode.tools/v0/schema.core.html

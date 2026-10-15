@@ -11,6 +11,7 @@ const state = {
   activeStatuses: new Set(),
   activeOrgs: new Set(),
   activeSoftwareTypes: new Set(),
+  activeLanguages: new Set(),
   sort: "name-asc",
 };
 
@@ -25,6 +26,10 @@ async function init() {
   const tagFromUrl = params.get("tag");
   if (tagFromUrl) {
     state.activeTags.add(tagFromUrl);
+  }
+  const languageFromUrl = params.get("language");
+  if (languageFromUrl) {
+    state.activeLanguages.add(languageFromUrl);
   }
 
   mountFilters();
@@ -68,6 +73,16 @@ function mountFilters() {
   const allSoftwareTypes = [
     ...new Set(state.projects.map((p) => p.softwareType).filter(Boolean)),
   ].sort();
+
+  const languageCounts = {};
+  for (const project of state.projects) {
+    for (const language of Object.keys(project.languages || {})) {
+      languageCounts[language] = (languageCounts[language] || 0) + 1;
+    }
+  }
+  const allLanguages = Object.keys(languageCounts).sort(
+    (a, b) => languageCounts[b] - languageCounts[a] || a.localeCompare(b)
+  );
 
   tagFilterHandle = mountTagFilter(
     document.getElementById("tag-filter-list"),
@@ -118,6 +133,21 @@ function mountFilters() {
       render();
     },
   });
+
+  mountCheckboxFilter(document.getElementById("language-filter-options"), {
+    options: allLanguages,
+    visibleLimit: 10,
+    searchPlaceholder: "Zoek programmeertaal…",
+    isActive: (language) => state.activeLanguages.has(language),
+    onToggle: (language) => {
+      if (state.activeLanguages.has(language)) {
+        state.activeLanguages.delete(language);
+      } else {
+        state.activeLanguages.add(language);
+      }
+      render();
+    },
+  });
 }
 
 function toggleTag(tag) {
@@ -156,6 +186,13 @@ function matchesOrg(project) {
 function matchesSoftwareType(project) {
   if (state.activeSoftwareTypes.size === 0) return true;
   return state.activeSoftwareTypes.has(project.softwareType);
+}
+
+function matchesLanguage(project) {
+  if (state.activeLanguages.size === 0) return true;
+  return Object.keys(project.languages || {}).some((language) =>
+    state.activeLanguages.has(language)
+  );
 }
 
 /** Total commits over the last 12 months, or 0 if no commit activity is known. */
@@ -207,7 +244,8 @@ function render() {
         matchesTags(project) &&
         matchesStatus(project) &&
         matchesOrg(project) &&
-        matchesSoftwareType(project)
+        matchesSoftwareType(project) &&
+        matchesLanguage(project)
     )
     .sort(SORTERS[state.sort] || SORTERS["name-asc"]);
 

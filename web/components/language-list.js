@@ -2,7 +2,8 @@ import { getLanguageColor } from "./language-colors.js";
 
 /**
  * Renders a GitHub-style language bar (stacked, coloured by share) plus a tag
- * per language (sorted by share, largest first) into `container`.
+ * per language (sorted by share, largest first) into `container`. Each tag
+ * links to the catalogue, filtered on that language.
  */
 export function renderLanguageList(container, languages) {
   container.innerHTML = "";
@@ -47,6 +48,8 @@ export function renderLanguageList(container, languages) {
     const percentage = total > 0 ? Math.round((bytes / total) * 100) : 0;
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".language-tag");
+    tag.href = `index.html?language=${encodeURIComponent(language)}`;
+    tag.title = `Toon alle projecten in ${language}`;
     const dot = document.createElement("span");
     dot.className = "language-tag__dot";
     dot.style.backgroundColor = getLanguageColor(language);

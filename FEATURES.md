@@ -70,10 +70,8 @@ de metadata mogelijk onvolledig of niet geverifieerd is.
   getoond.
 - De waarschuwing is zichtbaar op lijstniveau, zonder dat de detailpagina van het
   project geopend hoeft te worden.
-
-**Notities / open vragen**
-- **Besloten (PoC-implementatie):** badge met tekst "⚠ metadata onvolledig" op de
-  kaart; de detailpagina herhaalt de waarschuwing met een volledige uitleg-zin.
+- Op de detail pagina staat een alert met een volledige uitleg-zin:
+"⚠ Geen publiccode.yml gevonden voor dit project — onderstaande metadata is mogelijk onvolledig of niet geverifieerd. "
 
 ## Package manager & aantal dependencies
 
@@ -168,13 +166,50 @@ gebruikt, zodat ik projecten kan vinden op basis van de gebruikte technologie.
   detailpagina.
 - Gegeven een project geen detecteerbare programmeertaal heeft, toont de pagina
   dit duidelijk in plaats van een leeg of misleidend veld.
+- Het ophalen van programmeertalen moet forge‑agnostisch gebeuren en werkt zowel met Forgejo‑ als met GitLab‑instellingen.
+
+## Filteren op programmeertaal
+
+**User story**
+Als gebruiker van de catalogus wil ik de cataloguslijst kunnen filteren op
+programmeertaal, zodat ik snel projecten vind die gebouwd zijn in een taal die
+aansluit bij de kennis of het technologielandschap van mijn organisatie.
+
+**Acceptatiecriteria**
+- Gegeven de cataloguspagina, kan ik filteren op programmeertaal.
+- Het filter toont alleen talen die daadwerkelijk voorkomen in de projecten in
+  de catalogus.
+- Wanneer ik één of meer programmeertalen selecteer, toont de lijst alleen
+  projecten die die taal/talen gebruiken.
+- Gegeven een project geen detecteerbare programmeertaal heeft, wordt het project
+  niet getoond zodra minstens één taal actief geselecteerd is.
+- Wanneer geen enkel project voldoet aan de actieve filter(s), toont de pagina
+  een duidelijke "geen resultaten"-melding in plaats van een lege pagina.
+- Filteren op programmeertaal werkt samen met de andere filters (zoekbalk, tags,
+  ontwikkelstatus, organisatie, softwaretype) — ze versmallen de lijst
+  gezamenlijk, niet los van elkaar.
 
 **Notities / open vragen**
-- **Besloten (PoC-implementatie):** bron is GitHub's languages-API (bytes per
-  taal); detailpagina toont alle talen met hun percentage van de codebase.
-- **Besloten:** sorteren van de cataloguslijst op programmeertaal is uit scope
-  voor deze PoC. Op lijstniveau wordt alleen de primaire taal getoond, in de
-  vaste (alfabetische) volgorde van de lijst.
+- **Besloten (PoC-implementatie):** een project telt mee voor elke taal die het
+  gebruikt, ongeacht het aandeel in de codebase. Gevolg: onder talen als Shell
+  of Dockerfile verschijnen veel projecten, en het filter heeft veel opties.
+- **Besloten (PoC-implementatie):** meerdere geselecteerde talen werken als OF,
+  naar het patroon van ontwikkelstatus, organisatie en softwaretype.
+- **Besloten (PoC-implementatie):** meerkeuzefilter (checkboxes) in de zijbalk,
+  gesorteerd op aantal projecten dat de taal gebruikt (meest gebruikt eerst).
+  Alleen de eerste 10 talen zijn zichtbaar, met een "Toon meer"/"Toon
+  minder"-knop voor de rest (naar het patroon van het tagfilter); een actief
+  geselecteerde taal blijft altijd zichtbaar.
+- **Besloten (PoC-implementatie):** boven de taal-checkboxes staat een
+  type-ahead zoekveld dat de opties live versmalt (niet hoofdlettergevoelig,
+  substring-match). Tijdens het zoeken worden alle overeenkomende talen
+  getoond, ongeacht de "Toon meer"-limiet; zonder overeenkomsten toont het
+  filter "Geen overeenkomende opties.".
+- **Besloten (PoC-implementatie):** op de detailpagina zijn de taal-labels
+  klikbaar en openen ze de catalogus gefilterd op die taal
+  (`index.html?language=…`, naar het patroon van tags). Alle taal-labels zijn
+  klikbaar. Op de cataloguskaart zijn talen niet klikbaar.
+
 
 ## Contributor- en PR-activiteit per periode
 
