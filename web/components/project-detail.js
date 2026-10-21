@@ -3,6 +3,7 @@ import { renderCommitGraph } from "./commit-graph.js";
 import { renderContactList } from "./contact-list.js";
 import { renderDependencyList } from "./dependency-list.js";
 import { renderLanguageList } from "./language-list.js";
+import { renderRepositoryRules } from "./repository-rules.js";
 import { renderSoftwareTypeBadge } from "./software-type-badge.js";
 
 /** Renders the full project detail page into `container`. */
@@ -43,7 +44,12 @@ export function renderProjectDetail(container, project) {
   renderLanguageList(document.getElementById("language-list"), project.languages);
   renderActivityPanels(document.getElementById("activity-panels"), project.activity);
   renderCommitGraph(document.getElementById("commit-graph"), project.commitActivity);
-  renderDependencyList(document.getElementById("dependency-list"), project.dependencies);
+  renderRepositoryRules(document.getElementById("repository-rules"), project.compliance);
+  renderDependencyList(
+    document.getElementById("dependency-list"),
+    project.dependencies,
+    project.compliance?.vulnerablePackages,
+  );
   renderContactList(document.getElementById("contact-list"), project.contacts);
 }
 

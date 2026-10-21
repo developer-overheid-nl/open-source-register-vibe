@@ -99,6 +99,86 @@ project.
   gecombineerd getoond als één totaal per package manager (de SBOM maakt dit
   onderscheid niet expliciet beschikbaar).
 
+## Dependencies per package manager
+
+**User story**
+Als gebruiker van de catalogus wil ik op de detailpagina een package manager
+kunnen aanklikken en dan alleen de dependencies van die package manager zien,
+gesorteerd op het aantal transitieve dependencies, zodat ik per ecosysteem kan
+zien welke directe dependencies de meeste andere packages binnenhalen.
+
+**Acceptatiecriteria**
+- Gegeven de detailpagina van een project met één of meer package managers, kan
+  ik op een package manager klikken.
+- Wanneer ik op een package manager klik, toont de lijst alleen de directe
+  dependencies van die package manager, gesorteerd van meeste naar minste
+  transitieve dependencies.
+- Bij het openen van de detailpagina is de eerste package manager al
+  geselecteerd; er is geen gecombineerd overzicht over alle package managers.
+- Gegeven een package manager waarvoor geen directe dependencies bekend zijn,
+  kan ik deze niet aanklikken.
+- Bij elke package manager zie ik het aantal directe dependencies, met daarachter
+  (minder prominent) het aantal transitieve dependencies, bijv. "12 direct
+  + 559 transitief".
+- Gegeven een package manager met packages waarin bekende kwetsbaarheden zitten,
+  zie ik bij die package manager een rood bolletje met het aantal
+  kwetsbaarheden, en staan deze package managers vooraan (meeste eerst).
+
+**Notities / open vragen**
+- **Besloten (PoC-implementatie):** de ingest bewaart de top 20 directe
+  dependencies *per* package manager (in plaats van de top 20 over alle samen),
+  zodat ook kleinere ecosystemen een eigen lijst hebben. Het totale aantal
+  directe dependencies per package manager staat in `directCount`.
+- **Besloten (PoC-implementatie):** het bolletje telt unieke OSV-advisories
+  (GHSA, PYSEC, RUSTSEC, …) uit de repositoryregels, niet strikt CVE-nummers.
+  Eén CVE kan onder meerdere advisory-ID's voorkomen en dan dubbel tellen.
+
+## Repositoryregels
+
+**User story**
+Als gebruiker van de catalogus wil ik op de detailpagina zien of een project
+voldoet aan de repositoryregels van Developer Overheid
+([ort-config](https://github.com/developer-overheid-nl/ort-config)), zodat ik
+snel kan inschatten hoe goed een project is ingericht voor hergebruik en
+samenwerking.
+
+**Acceptatiecriteria**
+- Gegeven de detailpagina van een project, zie ik per regel of het project eraan
+  voldoet:
+
+  | Regel | Ernst |
+  | --- | --- |
+  | Geen bekende kwetsbaarheid in een dependency | Waarschuwing |
+  | `README.md` aanwezig | Fout |
+  | `LICENSE` aanwezig | Fout |
+  | `publiccode.yml` of `publiccode.yaml` aanwezig | Fout |
+  | `CONTRIBUTING.md` aanwezig | Fout |
+  | `SECURITY.md` aanwezig (ook in `.github/` of `docs/`) | Fout |
+  | `CODE_OF_CONDUCT.md` aanwezig (ook in `.github/` of `docs/`) | Waarschuwing |
+  | `CHANGELOG` of `CHANGELOG.md` aanwezig (ook in `.github/` of `docs/`) | Waarschuwing |
+  | Bekende CI-configuratie aanwezig | Waarschuwing |
+
+- Ik zie bovenaan een samenvatting (bijv. "6 van 9 regels voldaan · 2 fouten ·
+  1 waarschuwing"); overtredingen staan bovenaan, fouten vóór waarschuwingen.
+- Gegeven een project kwetsbare dependencies heeft, kan ik zien welke packages
+  dat zijn en via welke advisories (met link naar OSV).
+- Gegeven de regels voor een project niet gecontroleerd konden worden, toont de
+  detailpagina dit duidelijk in plaats van een misleidende uitslag.
+
+**Notities / open vragen**
+- **Besloten (PoC-implementatie):** de regels worden tijdens ingest nagebouwd in
+  plaats van ORT zelf te draaien (zie [ARCHITECTURE.md](./ARCHITECTURE.md)).
+  Bestandsregels controleren alleen aanwezigheid, niet de inhoud — net als in
+  `evaluator.rules.kts`.
+- **Besloten (PoC-implementatie):** alleen packages met een exacte versie worden
+  op kwetsbaarheden gecontroleerd; bij een project zonder lockfile kan de
+  kwetsbaarheidsregel dus te gunstig uitvallen.
+- Open vraag: wanneer de ort-config-regels wijzigen, moet de ingest handmatig
+  worden bijgewerkt. In het echte product ligt het voor de hand de ORT-runner
+  zelf te gebruiken en diens `run.json` in te lezen.
+- Open vraag: ook tonen/filteren op de cataloguslijst (bijv. alleen projecten
+  zonder fouten)?
+
 ## GitHub-link op detailpagina
 
 **User story**

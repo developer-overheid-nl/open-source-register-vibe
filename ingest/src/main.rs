@@ -81,44 +81,9 @@ const REPOS: &[(&str, &str, &str)] = &[
         "documentatie",
         "NL Design System (community)",
     ),
-    ("wigo4it", "nl-app", "Wigo4it"),
-    ("wigo4it", "techradar", "Wigo4it"),
-    ("wigo4it", "kwartaalmeeting", "Wigo4it"),
-    ("wigo4it", "knowledge-sharing-jp", "Wigo4it"),
-    ("wigo4it", "kerstbingo", "Wigo4it"),
-    ("wigo4it", "duurzaamheidsradar", "Wigo4it"),
-    ("wigo4it", "DevStream", "Wigo4it"),
-    ("wigo4it", "github-action-azure-devops-pipeline-runner", "Wigo4it"),
-    ("wigo4it", "module-tf-azure-aks", "Wigo4it"),
-    ("wigo4it", "platform-infra-talos-endpoints", "Wigo4it"),
-    ("wigo4it", "wigo4it-code-conventions-mcp", "Wigo4it"),
     ("wigo4it", "wigo4it-multitenant", "Wigo4it"),
-    ("wigo4it", "gitops-core-infra", "Wigo4it"),
-    ("wigo4it", "POC-Socrates-PDF-Vergelijker", "Wigo4it"),
-    ("wigo4it", "wigo4it-brandbook", "Wigo4it"),
-    ("wigo4it", "renovate-config", "Wigo4it"),
-    ("wigo4it", "azure-jwks-publisher", "Wigo4it"),
-    ("wigo4it", "modules-tf-leafcloud", "Wigo4it"),
-    ("wigo4it", "w4u-api-test-client", "Wigo4it"),
-    ("wigo4it", "jwks-publisher-w4", "Wigo4it"),
-    ("kadaster", "imbag", "Kadaster"),
-    ("kadaster", "imkad", "Kadaster"),
-    ("kadaster", "imbrt", "Kadaster"),
-    ("kadaster", "top10nl", "Kadaster"),
-    ("kadaster", "top50nl", "Kadaster"),
-    ("kadaster", "top250nl", "Kadaster"),
-    ("kadaster", "brt-algemeen", "Kadaster"),
-    ("kadaster", "klic-win", "Kadaster"),
-    ("kadaster", "top100nl", "Kadaster"),
-    ("kadaster", "top500nl", "Kadaster"),
-    ("kadaster", "vgl", "Kadaster"),
-    ("kadaster", "top1000nl", "Kadaster"),
-    ("kadaster", "metagegevens-voorbeelden", "Kadaster"),
     ("kadaster", "BRK-bevragen", "Kadaster"),
-    ("kadaster", "bag-leveranciers", "Kadaster"),
     ("kadaster", "WOZ-bevragen", "Kadaster"),
-    ("kadaster", "eurogeographics-erm-validator", "Kadaster"),
-    ("kadaster", "ladm-composer", "Kadaster"),
 ];
 
 #[derive(Debug, Deserialize, Default)]
@@ -414,16 +379,24 @@ fn empty_dependencies() -> Value {
 /// first-level (direct) dependency, how many other packages it transitively
 /// pulls in — computed by walking the SBOM's `DEPENDS_ON` graph from the
 /// package the repo's document `DESCRIBES`, so heavy first-level deps stand
-/// out. Only the top `TOP_DEPENDENCIES_LIMIT` (by transitive count) are
-/// returned; `directDependencyCount` carries the true total.
-fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>, owner: &str, repo: &str) -> Value {
+/// out. Only the top `TOP_DEPENDENCIES_LIMIT` (by transitive count) per
+/// ecosystem are returned; `directDependencyCount` carries the true total, and
+/// each `packageManagers` entry its own `directCount`.
+/// Also returns the package-manager purl of every SBOM package, for the
+/// vulnerability check in `fetch_compliance`.
+fn fetch_dependencies(
+    client: &reqwest::blocking::Client,
+    token: &Option<String>,
+    owner: &str,
+    repo: &str,
+) -> (Value, Vec<String>) {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/dependency-graph/sbom");
     let (status, body) = match api_get(client, token, &url) {
         Ok(v) => v,
-        Err(_) => return empty_dependencies(),
+        Err(_) => return (empty_dependencies(), Vec::new()),
     };
     if status != 200 {
-        return empty_dependencies();
+        return (empty_dependencies(), Vec::new());
     }
 
     let sbom = body.get("sbom").cloned().unwrap_or(Value::Null);
@@ -444,6 +417,7 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
 
     let mut pkg_by_id: BTreeMap<String, SbomPackage> = BTreeMap::new();
     let mut ecosystem_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut purls: Vec<String> = Vec::new();
 
     for pkg in &packages {
         let id = match pkg.get("SPDXID").and_then(|v| v.as_str()) {
@@ -459,7 +433,7 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
             .get("versionInfo")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let ecosystem = pkg
+        let purl = pkg
             .get("externalRefs")
             .and_then(|v| v.as_array())
             .and_then(|refs| {
@@ -467,11 +441,13 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
                     if r.get("referenceCategory").and_then(|v| v.as_str()) != Some("PACKAGE-MANAGER") {
                         return None;
                     }
-                    r.get("referenceLocator")
-                        .and_then(|v| v.as_str())
-                        .and_then(purl_ecosystem)
+                    r.get("referenceLocator").and_then(|v| v.as_str())
                 })
             });
+        let ecosystem = purl.and_then(purl_ecosystem);
+        if let Some(purl) = purl {
+            purls.push(purl.to_string());
+        }
         if let Some(eco) = &ecosystem {
             *ecosystem_counts.entry(eco.clone()).or_insert(0) += 1;
         }
@@ -479,13 +455,8 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
     }
 
     if pkg_by_id.is_empty() {
-        return empty_dependencies();
+        return (empty_dependencies(), purls);
     }
-
-    let package_managers: Vec<Value> = ecosystem_counts
-        .into_iter()
-        .map(|(ecosystem, count)| json!({ "ecosystem": ecosystem, "count": count }))
-        .collect();
 
     // pkg id -> ids it directly DEPENDS_ON (root included, keyed by doc_id's DESCRIBES target).
     let mut children: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -506,15 +477,23 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
     }
 
     let Some(root_id) = root_id else {
-        return json!({
+        let package_managers: Vec<Value> = ecosystem_counts
+            .into_iter()
+            .map(|(ecosystem, count)| json!({ "ecosystem": ecosystem, "count": count, "directCount": 0 }))
+            .collect();
+        let deps = json!({
             "available": true,
             "packageManagers": package_managers,
             "topDependencies": [],
             "directDependencyCount": 0,
         });
+        return (deps, purls);
     };
 
-    let direct_ids = children.get(&root_id).cloned().unwrap_or_default();
+    // The SBOM can list the same root edge more than once; count each package once.
+    let mut direct_ids = children.get(&root_id).cloned().unwrap_or_default();
+    direct_ids.sort();
+    direct_ids.dedup();
 
     let mut top: Vec<(&String, u32)> = direct_ids
         .iter()
@@ -539,26 +518,224 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
         .collect();
     top.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
 
-    let top_dependencies: Vec<Value> = top
+    // Cap per ecosystem (not globally) so every package manager keeps its own
+    // heaviest direct dependencies, even when one ecosystem dominates.
+    let mut direct_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut top_dependencies: Vec<Value> = Vec::new();
+    for (id, transitive_count) in top {
+        let Some(p) = pkg_by_id.get(id) else { continue };
+        let eco = p.ecosystem.clone().unwrap_or_default();
+        let seen = direct_counts.entry(eco).or_insert(0);
+        *seen += 1;
+        if (*seen as usize) > TOP_DEPENDENCIES_LIMIT {
+            continue;
+        }
+        top_dependencies.push(json!({
+            "name": p.name,
+            "version": p.version,
+            "ecosystem": p.ecosystem,
+            "transitiveCount": transitive_count,
+        }));
+    }
+
+    let package_managers: Vec<Value> = ecosystem_counts
         .into_iter()
-        .take(TOP_DEPENDENCIES_LIMIT)
-        .filter_map(|(id, transitive_count)| {
-            pkg_by_id.get(id).map(|p| {
-                json!({
-                    "name": p.name,
-                    "version": p.version,
-                    "ecosystem": p.ecosystem,
-                    "transitiveCount": transitive_count,
-                })
-            })
+        .map(|(ecosystem, count)| {
+            let direct_count = direct_counts.get(&ecosystem).copied().unwrap_or(0);
+            json!({ "ecosystem": ecosystem, "count": count, "directCount": direct_count })
         })
         .collect();
 
-    json!({
+    let deps = json!({
         "available": true,
         "packageManagers": package_managers,
         "topDependencies": top_dependencies,
         "directDependencyCount": direct_ids.len(),
+    });
+    (deps, purls)
+}
+
+/// Lists the entries (`path`, `type`, `sha`) of one git tree, with paths prefixed by
+/// `prefix`. Returns an empty list when the tree can't be fetched.
+fn list_tree(
+    client: &reqwest::blocking::Client,
+    token: &Option<String>,
+    owner: &str,
+    repo: &str,
+    tree_ref: &str,
+    prefix: &str,
+) -> Vec<(String, String, String)> {
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/git/trees/{tree_ref}");
+    let Ok((200, body)) = api_get(client, token, &url) else {
+        return Vec::new();
+    };
+    body.get("tree")
+        .and_then(|v| v.as_array())
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|e| {
+                    let path = e.get("path")?.as_str()?;
+                    let kind = e.get("type")?.as_str()?;
+                    let sha = e.get("sha")?.as_str()?;
+                    Some((format!("{prefix}{path}"), kind.to_string(), sha.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Ecosystems whose purls OSV understands; others (e.g. `githubactions`,
+/// `github`) are skipped for the vulnerability check.
+const OSV_ECOSYSTEMS: &[&str] = &["npm", "pypi", "cargo", "maven", "composer", "nuget", "gem", "golang"];
+
+/// Only exact versions are sent to OSV: for a range like `^4.17.15` OSV
+/// ignores the version and reports every advisory the package ever had.
+fn is_exact_version(version: &str) -> bool {
+    let v = version.strip_prefix('v').unwrap_or(version);
+    v.starts_with(|c: char| c.is_ascii_digit())
+        && v.chars().all(|c| c.is_ascii_alphanumeric() || ".+-_".contains(c))
+        && !v.to_ascii_lowercase().contains(".x")
+}
+
+/// Queries OSV for every SBOM package with an exact version and returns the
+/// vulnerable ones, mirroring ORT's `VULNERABILITY_IN_DEPENDENCY` rule
+/// (which also uses OSV). `None` when OSV couldn't be reached.
+fn fetch_vulnerabilities(client: &reqwest::blocking::Client, purls: &[String]) -> Option<Vec<Value>> {
+    let queryable: Vec<&String> = purls
+        .iter()
+        .filter(|p| {
+            purl_ecosystem(p).is_some_and(|e| OSV_ECOSYSTEMS.contains(&e.as_str()))
+                && p.rsplit_once('@').is_some_and(|(_, v)| is_exact_version(v))
+        })
+        .collect();
+
+    let mut vulnerable = Vec::new();
+    for chunk in queryable.chunks(1000) {
+        let queries: Vec<Value> = chunk.iter().map(|p| json!({ "package": { "purl": p } })).collect();
+        let resp = client
+            .post("https://api.osv.dev/v1/querybatch")
+            .header("User-Agent", "open-source-register-vibe-ingest")
+            .json(&json!({ "queries": queries }))
+            .send()
+            .ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let body: Value = resp.json().ok()?;
+        let results = body.get("results")?.as_array()?;
+        for (purl, result) in chunk.iter().zip(results) {
+            let advisories: Vec<&str> = result
+                .get("vulns")
+                .and_then(|v| v.as_array())
+                .map(|vs| vs.iter().filter_map(|v| v.get("id")?.as_str()).collect())
+                .unwrap_or_default();
+            if advisories.is_empty() {
+                continue;
+            }
+            let (name_part, version) = purl.rsplit_once('@').unwrap_or((purl, ""));
+            let name = name_part.split_once('/').map(|(_, n)| n).unwrap_or(name_part);
+            vulnerable.push(json!({
+                "name": name,
+                "version": version,
+                "ecosystem": purl_ecosystem(purl),
+                "advisories": advisories,
+            }));
+        }
+    }
+    Some(vulnerable)
+}
+
+/// Checks the repo against the rules in developer-overheid-nl/ort-config
+/// (`evaluator.rules.kts`): presence of community files and CI config, plus
+/// known vulnerabilities in dependencies. Like ORT, file checks only look at
+/// presence, not content.
+fn fetch_compliance(
+    client: &reqwest::blocking::Client,
+    token: &Option<String>,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+    purls: &[String],
+) -> Value {
+    let root = list_tree(client, token, owner, repo, branch, "");
+    if root.is_empty() {
+        return json!({ "available": false, "checks": [], "vulnerablePackages": [] });
+    }
+    // Rules only look in the root, .github/ and docs/, so fetch just those.
+    let mut entries = root.clone();
+    for (path, kind, sha) in &root {
+        if kind == "tree" && (path == ".github" || path == "docs") {
+            entries.extend(list_tree(client, token, owner, repo, sha, &format!("{path}/")));
+        }
+    }
+
+    let has_file = |paths: &[&str]| entries.iter().any(|(p, t, _)| t == "blob" && paths.contains(&p.as_str()));
+    let has_dir = |paths: &[&str]| entries.iter().any(|(p, t, _)| t == "tree" && paths.contains(&p.as_str()));
+    // `{file:(?i:changelog(?:\.md)?)}` in root, .github/ or docs/.
+    let has_changelog = entries.iter().any(|(p, t, _)| {
+        let file = p.strip_prefix(".github/").or_else(|| p.strip_prefix("docs/")).unwrap_or(p);
+        let file = file.to_ascii_lowercase();
+        t == "blob" && (file == "changelog" || file == "changelog.md")
+    });
+
+    let file_check = |id: &str, label: &str, severity: &str, passed: bool| {
+        json!({ "id": id, "label": label, "severity": severity, "passed": passed })
+    };
+
+    let vulnerabilities = fetch_vulnerabilities(client, purls);
+    let vulnerability_check = match &vulnerabilities {
+        Some(v) => json!({
+            "id": "VULNERABILITY_IN_DEPENDENCY",
+            "label": "Geen bekende kwetsbaarheden in dependencies",
+            "severity": "warning",
+            "passed": v.is_empty(),
+        }),
+        None => json!({
+            "id": "VULNERABILITY_IN_DEPENDENCY",
+            "label": "Geen bekende kwetsbaarheden in dependencies",
+            "severity": "warning",
+            "passed": null,
+        }),
+    };
+
+    let checks = vec![
+        vulnerability_check,
+        file_check("MISSING_README_FILE", "README.md aanwezig", "error", has_file(&["README.md"])),
+        file_check("MISSING_LICENSE_FILE", "LICENSE aanwezig", "error", has_file(&["LICENSE"])),
+        file_check(
+            "MISSING_PUBLICCODE_FILE",
+            "publiccode.yml aanwezig",
+            "error",
+            has_file(&["publiccode.yml", "publiccode.yaml"]),
+        ),
+        file_check("MISSING_CONTRIBUTING_FILE", "CONTRIBUTING.md aanwezig", "error", has_file(&["CONTRIBUTING.md"])),
+        file_check(
+            "MISSING_SECURITY_FILE",
+            "SECURITY.md aanwezig",
+            "error",
+            has_file(&["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md"]),
+        ),
+        file_check(
+            "MISSING_CODE_OF_CONDUCT_FILE",
+            "CODE_OF_CONDUCT.md aanwezig",
+            "warning",
+            has_file(&["CODE_OF_CONDUCT.md", ".github/CODE_OF_CONDUCT.md", "docs/CODE_OF_CONDUCT.md"]),
+        ),
+        file_check("MISSING_CHANGELOG_FILE", "CHANGELOG aanwezig", "warning", has_changelog),
+        file_check(
+            "MISSING_CI_CONFIGURATION",
+            "CI-configuratie aanwezig",
+            "warning",
+            has_file(&[".appveyor.yml", ".bitbucket-pipelines.yml", ".gitlab-ci.yml", ".travis.yml"])
+                || has_dir(&[".circleci", ".github/workflows"]),
+        ),
+    ];
+
+    json!({
+        "available": true,
+        "checks": checks,
+        "vulnerablePackages": vulnerabilities.unwrap_or_default(),
     })
 }
 
@@ -661,7 +838,8 @@ fn main() {
             .map(|(k, _)| k.clone());
 
         let activity = fetch_activity(&client, &token, owner, repo);
-        let dependencies = fetch_dependencies(&client, &token, owner, repo);
+        let (dependencies, purls) = fetch_dependencies(&client, &token, owner, repo);
+        let compliance = fetch_compliance(&client, &token, owner, repo, &default_branch, &purls);
         let commit_activity =
             fetch_commit_activity(&client, &token, owner, repo, &default_branch);
 
@@ -694,6 +872,7 @@ fn main() {
             "activity": activity,
             "commitActivity": commit_activity,
             "dependencies": dependencies,
+            "compliance": compliance,
         }));
     }
 

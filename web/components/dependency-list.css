@@ -6,7 +6,9 @@
 .dependency-list__summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.75rem;
+  /* Room for the vulnerability badges that stick out above the rows. */
+  padding-top: 0.55rem;
 }
 
 .dependency-row {
@@ -17,6 +19,44 @@
   display: flex;
   flex-direction: column;
   min-width: 8rem;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.dependency-row__vulns {
+  position: absolute;
+  top: -0.55rem;
+  right: -0.55rem;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-bg);
+  background: var(--color-error);
+  box-shadow: 0 0 0 2px var(--color-bg);
+}
+
+.dependency-row:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.dependency-row[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  background: var(--color-bg-subtle);
+}
+
+.dependency-row:disabled {
+  cursor: default;
 }
 
 .dependency-row__ecosystem {
@@ -24,8 +64,22 @@
 }
 
 .dependency-row__count {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 0.35rem;
   font-size: 0.85rem;
+}
+
+.dependency-row__direct {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dependency-row__transitive {
+  font-size: 0.8rem;
   color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .dependency-list__top {
@@ -75,14 +129,6 @@
   white-space: nowrap;
 }
 
-.dependency-top-row__ecosystem {
-  flex-shrink: 0;
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  background: var(--color-bg-subtle);
-  border-radius: 999px;
-  padding: 0.05rem 0.5rem;
-}
 
 .dependency-top-row__count {
   font-size: 0.8rem;

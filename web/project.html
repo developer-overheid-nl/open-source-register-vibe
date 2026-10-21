@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="components/contact-list.css" />
   <link rel="stylesheet" href="components/dependency-list.css" />
   <link rel="stylesheet" href="components/language-list.css" />
+  <link rel="stylesheet" href="components/repository-rules.css" />
 </head>
 <body>
   <header class="site-header">
@@ -76,6 +77,11 @@
       </section>
 
       <section class="project-detail__section">
+        <h2>Repositoryregels</h2>
+        <div class="repository-rules" id="repository-rules"></div>
+      </section>
+
+      <section class="project-detail__section">
         <h2>Package managers &amp; dependencies</h2>
         <div class="dependency-list" id="dependency-list"></div>
       </section>
@@ -124,17 +130,28 @@
   </template>
 
   <template id="tpl-dependency-row">
-    <div class="dependency-row">
+    <button type="button" class="dependency-row" aria-pressed="false">
+      <span class="dependency-row__vulns" hidden></span>
       <span class="dependency-row__ecosystem"></span>
-      <span class="dependency-row__count"></span>
-    </div>
+      <span class="dependency-row__count">
+        <span class="dependency-row__direct"></span>
+        <span class="dependency-row__transitive"></span>
+      </span>
+    </button>
+  </template>
+
+  <template id="tpl-repository-rule">
+    <li class="repository-rule">
+      <span class="repository-rule__icon" aria-hidden="true"></span>
+      <span class="repository-rule__label"></span>
+      <span class="repository-rule__status"></span>
+    </li>
   </template>
 
   <template id="tpl-dependency-top-row">
     <li class="dependency-top-row">
       <div class="dependency-top-row__main">
         <span class="dependency-top-row__name"></span>
-        <span class="dependency-top-row__ecosystem"></span>
       </div>
       <span class="dependency-top-row__count"></span>
       <div class="dependency-top-row__bar"><span class="dependency-top-row__bar-fill"></span></div>
