@@ -1,0 +1,6 @@
+version = 1
+
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 developer.overheid.nl"
+SPDX-License-Identifier = "EUPL-1.2"
