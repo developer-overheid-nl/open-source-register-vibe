@@ -1,0 +1,109 @@
+.repository-rules__empty {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.repository-rules__summary {
+  margin: 0 0 0.6rem;
+}
+
+.repository-rules__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-bg);
+}
+
+.repository-rule {
+  display: grid;
+  grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.6rem;
+  padding: 0.5rem 0.85rem;
+}
+
+.repository-rule + .repository-rule {
+  border-top: 1px solid var(--color-border);
+}
+
+.repository-rule__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-bg);
+  background: var(--color-text-muted);
+}
+
+.repository-rule__status {
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 0.05rem 0.55rem;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  background: var(--color-bg-subtle);
+}
+
+.repository-rule--pass .repository-rule__icon {
+  background: var(--color-accent);
+}
+
+.repository-rule--pass .repository-rule__label {
+  color: var(--color-text-muted);
+}
+
+.repository-rule--error .repository-rule__icon {
+  background: var(--color-error);
+}
+
+.repository-rule--error .repository-rule__status {
+  color: var(--color-error);
+  background: var(--color-error-bg);
+  font-weight: 600;
+}
+
+.repository-rule--warning .repository-rule__icon {
+  color: var(--color-warning-text);
+  background: var(--color-warning-border);
+}
+
+.repository-rule--warning .repository-rule__status {
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  font-weight: 600;
+}
+
+.repository-rule__details {
+  grid-column: 2 / -1;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.repository-rule__details summary {
+  cursor: pointer;
+  color: var(--color-primary);
+}
+
+.repository-rule__packages {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.repository-rule__package {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.repository-rules__source {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  margin: 0.5rem 0 0;
+}

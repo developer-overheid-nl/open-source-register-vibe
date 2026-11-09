@@ -34,6 +34,17 @@
   background: var(--color-bg);
 }
 
+.language-tag {
+  color: inherit;
+  text-decoration: none;
+}
+
+.language-tag:hover,
+.language-tag:focus-visible {
+  border-color: currentColor;
+  text-decoration: underline;
+}
+
 .language-tag__dot {
   width: 0.6rem;
   height: 0.6rem;

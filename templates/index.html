@@ -29,6 +29,35 @@
           </div>
         </section>
         <section class="filters__section">
+          <h2 class="filters__heading">Programmeertaal</h2>
+          <div class="checkbox-filter" id="language-filter-options">
+            <input
+              type="search"
+              class="checkbox-filter__search"
+              placeholder="Zoek programmeertaal…"
+              aria-label="Zoek programmeertaal…"
+              autocomplete="off"
+              hidden
+            />
+            {% for option in languages %}
+            <label class="checkbox-filter__option"
+              ><input
+                type="checkbox"
+                class="checkbox-filter__checkbox"
+                value="{{ option.value }}"
+                {% if option.active %}checked{% endif %}
+              /><span class="checkbox-filter__label">{{ option.value }}</span></label
+            >
+            {% endfor %}
+            <p class="checkbox-filter__no-matches" hidden>Geen overeenkomende opties.</p>
+            {% if languages | length > 10 %}
+            <button type="button" class="checkbox-filter__toggle" aria-expanded="false" hidden>
+              Toon meer
+            </button>
+            {% endif %}
+          </div>
+        </section>
+        <section class="filters__section">
           <h2 class="filters__heading">Ontwikkelstatus</h2>
           <div class="checkbox-filter" id="status-filter-options">
             {% for option in statuses %}

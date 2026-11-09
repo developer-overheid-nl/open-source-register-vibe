@@ -70,10 +70,8 @@ de metadata mogelijk onvolledig of niet geverifieerd is.
   getoond.
 - De waarschuwing is zichtbaar op lijstniveau, zonder dat de detailpagina van het
   project geopend hoeft te worden.
-
-**Notities / open vragen**
-- **Besloten (PoC-implementatie):** badge met tekst "⚠ metadata onvolledig" op de
-  kaart; de detailpagina herhaalt de waarschuwing met een volledige uitleg-zin.
+- Op de detail pagina staat een alert met een volledige uitleg-zin:
+"⚠ Geen publiccode.yml gevonden voor dit project — onderstaande metadata is mogelijk onvolledig of niet geverifieerd. "
 
 ## Package manager & aantal dependencies
 
@@ -101,6 +99,86 @@ project.
 - **Besloten (PoC-implementatie):** directe en transitieve dependencies worden
   gecombineerd getoond als één totaal per package manager (de SBOM maakt dit
   onderscheid niet expliciet beschikbaar).
+
+## Dependencies per package manager
+
+**User story**
+Als gebruiker van de catalogus wil ik op de detailpagina een package manager
+kunnen aanklikken en dan alleen de dependencies van die package manager zien,
+gesorteerd op het aantal transitieve dependencies, zodat ik per ecosysteem kan
+zien welke directe dependencies de meeste andere packages binnenhalen.
+
+**Acceptatiecriteria**
+- Gegeven de detailpagina van een project met één of meer package managers, kan
+  ik op een package manager klikken.
+- Wanneer ik op een package manager klik, toont de lijst alleen de directe
+  dependencies van die package manager, gesorteerd van meeste naar minste
+  transitieve dependencies.
+- Bij het openen van de detailpagina is de eerste package manager al
+  geselecteerd; er is geen gecombineerd overzicht over alle package managers.
+- Gegeven een package manager waarvoor geen directe dependencies bekend zijn,
+  kan ik deze niet aanklikken.
+- Bij elke package manager zie ik het aantal directe dependencies, met daarachter
+  (minder prominent) het aantal transitieve dependencies, bijv. "12 direct
+  + 559 transitief".
+- Gegeven een package manager met packages waarin bekende kwetsbaarheden zitten,
+  zie ik bij die package manager een rood bolletje met het aantal
+  kwetsbaarheden, en staan deze package managers vooraan (meeste eerst).
+
+**Notities / open vragen**
+- **Besloten (PoC-implementatie):** de ingest bewaart de top 20 directe
+  dependencies *per* package manager (in plaats van de top 20 over alle samen),
+  zodat ook kleinere ecosystemen een eigen lijst hebben. Het totale aantal
+  directe dependencies per package manager staat in `directCount`.
+- **Besloten (PoC-implementatie):** het bolletje telt unieke OSV-advisories
+  (GHSA, PYSEC, RUSTSEC, …) uit de repositoryregels, niet strikt CVE-nummers.
+  Eén CVE kan onder meerdere advisory-ID's voorkomen en dan dubbel tellen.
+
+## Repositoryregels
+
+**User story**
+Als gebruiker van de catalogus wil ik op de detailpagina zien of een project
+voldoet aan de repositoryregels van Developer Overheid
+([ort-config](https://github.com/developer-overheid-nl/ort-config)), zodat ik
+snel kan inschatten hoe goed een project is ingericht voor hergebruik en
+samenwerking.
+
+**Acceptatiecriteria**
+- Gegeven de detailpagina van een project, zie ik per regel of het project eraan
+  voldoet:
+
+  | Regel | Ernst |
+  | --- | --- |
+  | Geen bekende kwetsbaarheid in een dependency | Waarschuwing |
+  | `README.md` aanwezig | Fout |
+  | `LICENSE` aanwezig | Fout |
+  | `publiccode.yml` of `publiccode.yaml` aanwezig | Fout |
+  | `CONTRIBUTING.md` aanwezig | Fout |
+  | `SECURITY.md` aanwezig (ook in `.github/` of `docs/`) | Fout |
+  | `CODE_OF_CONDUCT.md` aanwezig (ook in `.github/` of `docs/`) | Waarschuwing |
+  | `CHANGELOG` of `CHANGELOG.md` aanwezig (ook in `.github/` of `docs/`) | Waarschuwing |
+  | Bekende CI-configuratie aanwezig | Waarschuwing |
+
+- Ik zie bovenaan een samenvatting (bijv. "6 van 9 regels voldaan · 2 fouten ·
+  1 waarschuwing"); overtredingen staan bovenaan, fouten vóór waarschuwingen.
+- Gegeven een project kwetsbare dependencies heeft, kan ik zien welke packages
+  dat zijn en via welke advisories (met link naar OSV).
+- Gegeven de regels voor een project niet gecontroleerd konden worden, toont de
+  detailpagina dit duidelijk in plaats van een misleidende uitslag.
+
+**Notities / open vragen**
+- **Besloten (PoC-implementatie):** de regels worden tijdens ingest nagebouwd in
+  plaats van ORT zelf te draaien (zie [ARCHITECTURE.md](./ARCHITECTURE.md)).
+  Bestandsregels controleren alleen aanwezigheid, niet de inhoud — net als in
+  `evaluator.rules.kts`.
+- **Besloten (PoC-implementatie):** alleen packages met een exacte versie worden
+  op kwetsbaarheden gecontroleerd; bij een project zonder lockfile kan de
+  kwetsbaarheidsregel dus te gunstig uitvallen.
+- Open vraag: wanneer de ort-config-regels wijzigen, moet de ingest handmatig
+  worden bijgewerkt. In het echte product ligt het voor de hand de ORT-runner
+  zelf te gebruiken en diens `run.json` in te lezen.
+- Open vraag: ook tonen/filteren op de cataloguslijst (bijv. alleen projecten
+  zonder fouten)?
 
 ## GitHub-link op detailpagina
 
@@ -169,13 +247,50 @@ gebruikt, zodat ik projecten kan vinden op basis van de gebruikte technologie.
   detailpagina.
 - Gegeven een project geen detecteerbare programmeertaal heeft, toont de pagina
   dit duidelijk in plaats van een leeg of misleidend veld.
+- Het ophalen van programmeertalen moet forge‑agnostisch gebeuren en werkt zowel met Forgejo‑ als met GitLab‑instellingen.
+
+## Filteren op programmeertaal
+
+**User story**
+Als gebruiker van de catalogus wil ik de cataloguslijst kunnen filteren op
+programmeertaal, zodat ik snel projecten vind die gebouwd zijn in een taal die
+aansluit bij de kennis of het technologielandschap van mijn organisatie.
+
+**Acceptatiecriteria**
+- Gegeven de cataloguspagina, kan ik filteren op programmeertaal.
+- Het filter toont alleen talen die daadwerkelijk voorkomen in de projecten in
+  de catalogus.
+- Wanneer ik één of meer programmeertalen selecteer, toont de lijst alleen
+  projecten die die taal/talen gebruiken.
+- Gegeven een project geen detecteerbare programmeertaal heeft, wordt het project
+  niet getoond zodra minstens één taal actief geselecteerd is.
+- Wanneer geen enkel project voldoet aan de actieve filter(s), toont de pagina
+  een duidelijke "geen resultaten"-melding in plaats van een lege pagina.
+- Filteren op programmeertaal werkt samen met de andere filters (zoekbalk, tags,
+  ontwikkelstatus, organisatie, softwaretype) — ze versmallen de lijst
+  gezamenlijk, niet los van elkaar.
 
 **Notities / open vragen**
-- **Besloten (PoC-implementatie):** bron is GitHub's languages-API (bytes per
-  taal); detailpagina toont alle talen met hun percentage van de codebase.
-- **Besloten:** sorteren van de cataloguslijst op programmeertaal is uit scope
-  voor deze PoC. Op lijstniveau wordt alleen de primaire taal getoond, in de
-  vaste (alfabetische) volgorde van de lijst.
+- **Besloten (PoC-implementatie):** een project telt mee voor elke taal die het
+  gebruikt, ongeacht het aandeel in de codebase. Gevolg: onder talen als Shell
+  of Dockerfile verschijnen veel projecten, en het filter heeft veel opties.
+- **Besloten (PoC-implementatie):** meerdere geselecteerde talen werken als OF,
+  naar het patroon van ontwikkelstatus, organisatie en softwaretype.
+- **Besloten (PoC-implementatie):** meerkeuzefilter (checkboxes) in de zijbalk,
+  gesorteerd op aantal projecten dat de taal gebruikt (meest gebruikt eerst).
+  Alleen de eerste 10 talen zijn zichtbaar, met een "Toon meer"/"Toon
+  minder"-knop voor de rest (naar het patroon van het tagfilter); een actief
+  geselecteerde taal blijft altijd zichtbaar.
+- **Besloten (PoC-implementatie):** boven de taal-checkboxes staat een
+  type-ahead zoekveld dat de opties live versmalt (niet hoofdlettergevoelig,
+  substring-match). Tijdens het zoeken worden alle overeenkomende talen
+  getoond, ongeacht de "Toon meer"-limiet; zonder overeenkomsten toont het
+  filter "Geen overeenkomende opties.".
+- **Besloten (PoC-implementatie):** op de detailpagina zijn de taal-labels
+  klikbaar en openen ze de catalogus gefilterd op die taal
+  (`index.html?language=…`, naar het patroon van tags). Alle taal-labels zijn
+  klikbaar. Op de cataloguskaart zijn talen niet klikbaar.
+
 
 ## Contributor- en PR-activiteit per periode
 

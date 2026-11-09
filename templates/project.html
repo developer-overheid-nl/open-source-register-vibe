@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/static/components/contact-list.css" />
 <link rel="stylesheet" href="/static/components/dependency-list.css" />
 <link rel="stylesheet" href="/static/components/language-list.css" />
+<link rel="stylesheet" href="/static/components/repository-rules.css" />
 {% endblock styles %}
 {% block content %}
 <main class="page">
@@ -72,9 +73,12 @@
           ></span>{% endfor %}
         </div>
         <div class="language-list__tags">
-          {% for tag in p.languages.tags %}<span class="language-tag"
+          {% for tag in p.languages.tags %}<a
+            class="language-tag"
+            href="{{ tag.href }}"
+            title="{{ tag.title }}"
             ><span class="language-tag__dot" style="background-color: {{ tag.color }}"></span
-            >{{ tag.label }}</span
+            >{{ tag.label }}</a
           >{% endfor %}
         </div>
         {% else %}
@@ -148,23 +152,37 @@
       <div class="dependency-list" id="dependency-list">
         {% if p.dependencies.available %}
         <div class="dependency-list__summary">
-          {% for row in p.dependencies.rows %}
-          <div class="dependency-row">
-            <span class="dependency-row__ecosystem">{{ row.label }}</span>
-            <span class="dependency-row__count">{{ row.text }}</span>
-          </div>
+          {% for tab in p.dependencies.tabs %}
+          <button
+            type="button"
+            class="dependency-row"
+            data-ecosystem="{{ tab.ecosystem }}"
+            aria-pressed="{{ tab.selected }}"
+            title="{{ tab.title }}"
+            {% if tab.disabled %}disabled{% endif %}
+          >
+            <span class="dependency-row__ecosystem">{{ tab.label }}</span>
+            <span class="dependency-row__count">
+              <span class="dependency-row__direct">{{ tab.direct }} direct</span>
+              <span class="dependency-row__transitive">+ {{ tab.transitive }} transitief</span>
+            </span>
+            {% if tab.advisories > 0 %}
+            <span class="dependency-row__vulns" title="{{ tab.vulns_title }}" aria-label="{{ tab.vulns_title }}"
+              >{{ tab.advisories }}</span
+            >
+            {% endif %}
+          </button>
           {% endfor %}
         </div>
-        {% if p.dependencies.has_top %}
-        <div class="dependency-list__top">
-          <h3 class="dependency-list__top-heading">Directe dependencies met de meeste transitieve dependencies</h3>
-          <p class="dependency-list__top-hint">{{ p.dependencies.hint }}</p>
+        {% for panel in p.dependencies.panels %}
+        <div class="dependency-list__top" data-ecosystem="{{ panel.ecosystem }}">
+          <h3 class="dependency-list__top-heading">{{ panel.heading }}</h3>
+          <p class="dependency-list__top-hint">{{ panel.hint }}</p>
           <ol class="dependency-list__top-rows">
-            {% for row in p.dependencies.top_rows %}
+            {% for row in panel.rows %}
             <li class="dependency-top-row">
               <div class="dependency-top-row__main">
                 <span class="dependency-top-row__name">{{ row.name }}</span>
-                <span class="dependency-top-row__ecosystem">{{ row.ecosystem_label }}</span>
               </div>
               <span class="dependency-top-row__count">{{ row.text }}</span>
               <div class="dependency-top-row__bar"><span class="dependency-top-row__bar-fill" style="width: {{ row.width }}%"></span></div>
@@ -172,10 +190,56 @@
             {% endfor %}
           </ol>
         </div>
-        {% endif %}
+        {% endfor %}
         {% else %}
         <p class="dependency-list__empty">Geen detecteerbare package manager gevonden voor dit project.</p>
         {% endif %}
+      </div>
+    </section>
+
+    <section class="project-detail__section">
+      <h2>Repositoryregels</h2>
+      <div class="repository-rules" id="repository-rules">
+        {% if p.rules.available %}
+        <p class="repository-rules__summary">{{ p.rules.summary }}</p>
+        <ul class="repository-rules__list">
+          {% for check in p.rules.checks %}
+          <li class="repository-rule repository-rule--{{ check.modifier }}">
+            <span class="repository-rule__icon" aria-hidden="true">{{ check.icon }}</span>
+            <span class="repository-rule__label">{{ check.label }}</span>
+            <span class="repository-rule__status">{{ check.status_text }}</span>
+            {% if check.has_vulnerable %}
+            <details class="repository-rule__details">
+              <summary>{{ check.vulnerable_summary }}</summary>
+              <ul class="repository-rule__packages">
+                {% for pkg in check.vulnerable %}
+                <li>
+                  <span class="repository-rule__package">{{ pkg.name }}</span>
+                  {%- for advisory in pkg.advisories %}{% if loop.first %} — {% else %}, {% endif %}<a
+                    href="{{ advisory.url }}"
+                    target="_blank"
+                    rel="noopener"
+                    >{{ advisory.id }}</a
+                  >{%- endfor %}
+                </li>
+                {% endfor %}
+              </ul>
+            </details>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="repository-rules__empty">
+          Repositoryregels konden voor dit project niet worden gecontroleerd.
+        </p>
+        {% endif %}
+        <p class="repository-rules__source">
+          Regels uit
+          <a href="https://github.com/developer-overheid-nl/ort-config" target="_blank" rel="noopener"
+            >developer-overheid-nl/ort-config</a
+          >. Bestanden worden alleen op aanwezigheid gecontroleerd, niet op inhoud.
+        </p>
       </div>
     </section>
 
@@ -198,3 +262,4 @@
   </article>
 </main>
 {% endblock content %}
+{% block scripts %}<script type="module" src="/static/detail.js"></script>{% endblock scripts %}

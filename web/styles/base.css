@@ -20,6 +20,8 @@
   --color-warning-bg: #fff4db; /* rhc-color-donkergeel-50 */
   --color-warning-border: #ffb612; /* rhc-color-donkergeel-500 */
   --color-warning-text: #0f172a;
+  --color-error: #d52b1e; /* rhc-color-rood-500 */
+  --color-error-bg: #fbe9e8; /* rhc-color-rood-50 */
   --color-focus: #000000; /* rhc-focus-outline-color */
   --radius: 5px; /* rhc-border-radius-md */
   --font-sans: "RijksSans", "RijksoverheidSansWeb", Arial, Verdana, sans-serif;

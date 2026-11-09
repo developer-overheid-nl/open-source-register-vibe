@@ -70,15 +70,16 @@ async fn main() {
     axum::serve(listener, app).await.expect("serverfout");
 }
 
-/// Leest de `?tag=…`-parameters meermaals (dedupe, lege waarden ignore).
-fn active_tags(query: &[(String, String)]) -> Vec<String> {
-    let mut tags = Vec::new();
-    for (key, value) in query {
-        if key == "tag" && !value.is_empty() && !tags.contains(value) {
-            tags.push(value.clone());
+/// Leest herhaalde query-parameters (bijv. `?tag=…` of `?language=…`)
+/// meermaals (dedupe, lege waarden genegeerd).
+fn active_values(query: &[(String, String)], key: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    for (k, value) in query {
+        if k == key && !value.is_empty() && !values.contains(value) {
+            values.push(value.clone());
         }
     }
-    tags
+    values
 }
 
 fn current_data(state: &AppState) -> Option<Arc<Value>> {
@@ -113,7 +114,9 @@ async fn catalog(
     let Some(data) = current_data(&state) else {
         return Ok(render_loading(&state));
     };
-    let context = view::catalog_context(&data, &active_tags(&query));
+    let active_tags = active_values(&query, "tag");
+    let active_languages = active_values(&query, "language");
+    let context = view::catalog_context(&data, &active_tags, &active_languages);
     render(&state, "index.html", &context)
 }
 

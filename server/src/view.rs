@@ -41,6 +41,16 @@ fn project_tags(project: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Alle programmeertalen van een project (keys van de `languages`-map, bytes
+/// per taal) — een project telt mee voor élke taal die het gebruikt.
+fn project_languages(project: &Value) -> Vec<String> {
+    project
+        .get("languages")
+        .and_then(|l| l.as_object())
+        .map(|m| m.keys().map(|k| k.to_string()).collect())
+        .unwrap_or_default()
+}
+
 /// Percent-encode a path/query component (RFC 3986 unreserved characters stay).
 fn url_encode(s: &str) -> String {
     let mut out = String::new();
@@ -55,17 +65,24 @@ fn url_encode(s: &str) -> String {
     out
 }
 
-/// Builds the catalog URL for a set of active tags (AND-logic), e.g.
-/// `/?tag=frontend&tag=rust`, or `/` for no tags.
-fn tags_url(tags: &[String]) -> String {
-    if tags.is_empty() {
-        return "/".to_string();
-    }
-    let params: Vec<String> = tags
+/// Builds the catalog URL for a set of active tags (AND-logic) and languages
+/// (OR-logic), e.g. `/?tag=frontend&tag=rust&language=Rust`, or `/` for no
+/// filters.
+fn catalog_url(tags: &[String], languages: &[String]) -> String {
+    let mut params: Vec<String> = tags
         .iter()
         .map(|t| format!("tag={}", url_encode(t)))
         .collect();
-    format!("/?{}", params.join("&"))
+    params.extend(
+        languages
+            .iter()
+            .map(|l| format!("language={}", url_encode(l))),
+    );
+    if params.is_empty() {
+        "/".to_string()
+    } else {
+        format!("/?{}", params.join("&"))
+    }
 }
 
 /// Returns `active` with `tag` toggled (added/removed), preserving order.
@@ -96,6 +113,8 @@ struct TagPill {
 #[derive(Serialize)]
 struct CheckboxOption {
     value: String,
+    /// Vooraangevinkt wanneer de URL dit filter al actief heeft (`?language=…`).
+    active: bool,
 }
 
 #[derive(Serialize)]
@@ -125,6 +144,7 @@ struct CardView {
     data_status: String,
     data_org: String,
     data_software_type: String,
+    data_languages: String,
     data_name: String,
     data_commits: u64,
     data_contributors: u64,
@@ -157,6 +177,9 @@ struct LangSegment {
 struct LangTag {
     label: String,
     color: String,
+    /// Linkt de catalogus, gefilterd op deze taal (`/?language=…`).
+    href: String,
+    title: String,
 }
 
 #[derive(Serialize)]
@@ -189,26 +212,75 @@ struct CommitGraph {
 }
 
 #[derive(Serialize)]
-struct DepRow {
+struct DepTab {
+    /// Ruwe ecosysteem-sleutel (bijv. `npm`), koppelt tab aan zijn paneel.
+    ecosystem: String,
     label: String,
-    text: String,
+    /// Aantal directe dependencies van deze package manager.
+    direct: u64,
+    /// Alles wat de SBOM nog meer bevat voor dit ecosysteem.
+    transitive: u64,
+    /// Aantal unieke OSV-advisories voor dit ecosysteem (rood bolletje).
+    advisories: u64,
+    vulns_title: String,
+    /// Geen directe dependencies bekend → niet aanklikbaar.
+    disabled: bool,
+    selected: bool,
+    title: String,
 }
 
 #[derive(Serialize)]
 struct DepTopRow {
     name: String,
-    ecosystem_label: String,
     width: String,
     text: String,
 }
 
 #[derive(Serialize)]
+struct DepPanel {
+    ecosystem: String,
+    heading: String,
+    hint: String,
+    rows: Vec<DepTopRow>,
+}
+
+#[derive(Serialize)]
 struct DepsSection {
     available: bool,
-    rows: Vec<DepRow>,
-    has_top: bool,
-    hint: String,
-    top_rows: Vec<DepTopRow>,
+    tabs: Vec<DepTab>,
+    panels: Vec<DepPanel>,
+}
+
+#[derive(Clone, Serialize)]
+struct AdvisoryLink {
+    id: String,
+    url: String,
+}
+
+#[derive(Clone, Serialize)]
+struct VulnerablePackage {
+    name: String,
+    advisories: Vec<AdvisoryLink>,
+}
+
+#[derive(Serialize)]
+struct RuleCheck {
+    /// `pass` | `error` | `warning` | `unknown` — bepaalt de stijl van de rij.
+    modifier: String,
+    icon: String,
+    label: String,
+    status_text: String,
+    vulnerable: Vec<VulnerablePackage>,
+    vulnerable_summary: String,
+    /// Of de uitklapbare lijst kwetsbare packages getoond moet worden.
+    has_vulnerable: bool,
+}
+
+#[derive(Serialize)]
+struct RulesSection {
+    available: bool,
+    summary: String,
+    checks: Vec<RuleCheck>,
 }
 
 #[derive(Serialize)]
@@ -235,6 +307,7 @@ struct DetailView {
     panels: Vec<Panel>,
     commit_graph: CommitGraph,
     dependencies: DepsSection,
+    rules: RulesSection,
     has_contacts: bool,
     contacts: Vec<Contact>,
 }
@@ -381,7 +454,7 @@ fn sparkline(ca: &Value) -> Option<Sparkline> {
     })
 }
 
-fn card_view(project: &Value, active_tags: &[String]) -> CardView {
+fn card_view(project: &Value, active_tags: &[String], active_languages: &[String]) -> CardView {
     let slug = get_str(project, "slug").unwrap_or_default().to_string();
     let name = get_str(project, "name").unwrap_or_default().to_string();
     let org = get_str(project, "org").unwrap_or_default().to_string();
@@ -392,6 +465,7 @@ fn card_view(project: &Value, active_tags: &[String]) -> CardView {
     let software_type = get_str(project, "softwareType").unwrap_or_default().to_string();
     let language = get_str(project, "primaryLanguage").map(|s| s.to_string());
     let tags = project_tags(project);
+    let languages = project_languages(project);
 
     let search = format!(
         "{} {} {}",
@@ -416,7 +490,7 @@ fn card_view(project: &Value, active_tags: &[String]) -> CardView {
             .iter()
             .map(|tag| TagChip {
                 label: tag.clone(),
-                href: tags_url(&toggle_tag(active_tags, tag)),
+                href: catalog_url(&toggle_tag(active_tags, tag), active_languages),
                 active: false,
                 count: None,
             })
@@ -427,6 +501,7 @@ fn card_view(project: &Value, active_tags: &[String]) -> CardView {
         data_status: get_str(project, "developmentStatus").unwrap_or_default().to_string(),
         data_org: org,
         data_software_type: software_type,
+        data_languages: serde_json::to_string(&languages).unwrap_or_else(|_| "[]".to_string()),
         data_name: name.to_lowercase(),
         data_commits: total_commits(project),
         data_contributors: all_time_contributors(project),
@@ -441,9 +516,24 @@ fn matches_tags(project: &Value, active_tags: &[String]) -> bool {
     active_tags.iter().all(|t| tags.contains(t))
 }
 
+/// Matches the server-side `?language=` pre-filter: a project counts for
+/// every language it uses, so multiple active languages work as OR (see
+/// FEATURES.md).
+fn matches_languages(project: &Value, active_languages: &[String]) -> bool {
+    if active_languages.is_empty() {
+        return true;
+    }
+    let languages = project_languages(project);
+    let known: HashSet<&str> = languages.iter().map(|s| s.as_str()).collect();
+    active_languages
+        .iter()
+        .any(|l| known.contains(l.as_str()))
+}
+
 /// Context for the catalog page. `projects` is the full in-memory dataset;
-/// `active_tags` comes from the `?tag=` query parameters.
-pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
+/// `active_tags`/`active_languages` come from the `?tag=`/`?language=` query
+/// parameters (server-side pre-filters that also work without JavaScript).
+pub fn catalog_context(data: &Value, active_tags: &[String], active_languages: &[String]) -> Context {
     let all: &Vec<Value> = match get_array(data, "projects") {
         Some(p) => p,
         None => return Context::new(),
@@ -451,12 +541,16 @@ pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
 
     // Sidebar options are computed over the full, unfiltered dataset...
     let mut tag_counts: BTreeMap<String, u64> = BTreeMap::new();
+    let mut language_counts: BTreeMap<String, u64> = BTreeMap::new();
     let mut statuses: HashSet<&str> = HashSet::new();
     let mut orgs: HashSet<&str> = HashSet::new();
     let mut software_types: HashSet<&str> = HashSet::new();
     for project in all {
         for tag in project_tags(project) {
             *tag_counts.entry(tag).or_insert(0) += 1;
+        }
+        for language in project_languages(project) {
+            *language_counts.entry(language).or_insert(0) += 1;
         }
         if let Some(s) = get_str(project, "developmentStatus") {
             statuses.insert(s);
@@ -472,11 +566,16 @@ pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
     let mut tags_sorted: Vec<(String, u64)> = tag_counts.into_iter().collect();
     tags_sorted.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 
-    // ...while the card list is pre-filtered on the active tags.
+    // Language options sorted on how many projects use the language (most
+    // used first, then alphabetically) — see FEATURES.md.
+    let mut languages_sorted: Vec<(String, u64)> = language_counts.into_iter().collect();
+    languages_sorted.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    // ...while the card list is pre-filtered on the active tags and languages.
     let mut cards: Vec<CardView> = all
         .iter()
-        .filter(|p| matches_tags(p, active_tags))
-        .map(|p| card_view(p, active_tags))
+        .filter(|p| matches_tags(p, active_tags) && matches_languages(p, active_languages))
+        .map(|p| card_view(p, active_tags, active_languages))
         .collect();
     cards.sort_by(|a, b| a.data_name.cmp(&b.data_name));
 
@@ -490,7 +589,7 @@ pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
             .iter()
             .map(|(tag, count)| TagChip {
                 label: tag.clone(),
-                href: tags_url(&toggle_tag(active_tags, tag)),
+                href: catalog_url(&toggle_tag(active_tags, tag), active_languages),
                 active: active_tags.iter().any(|t| t == tag),
                 count: Some(*count),
             })
@@ -502,7 +601,7 @@ pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
             .iter()
             .map(|tag| TagPill {
                 tag: tag.clone(),
-                href: tags_url(&toggle_tag(active_tags, tag)),
+                href: catalog_url(&toggle_tag(active_tags, tag), active_languages),
             })
             .collect::<Vec<TagPill>>(),
     );
@@ -512,6 +611,16 @@ pub fn catalog_context(data: &Value, active_tags: &[String]) -> Context {
     );
     context.insert("orgs", &sorted_options(orgs));
     context.insert("software_types", &sorted_options(software_types));
+    context.insert(
+        "languages",
+        &languages_sorted
+            .iter()
+            .map(|(language, _count)| CheckboxOption {
+                value: language.clone(),
+                active: active_languages.iter().any(|l| l == language),
+            })
+            .collect::<Vec<CheckboxOption>>(),
+    );
     context
 }
 
@@ -521,6 +630,7 @@ fn sorted_options(values: HashSet<&str>) -> Vec<CheckboxOption> {
     v.into_iter()
         .map(|value| CheckboxOption {
             value: value.to_string(),
+            active: false,
         })
         .collect()
 }
@@ -594,6 +704,8 @@ fn language_section(languages: &Value) -> LanguageSection {
             .map(|(language, bytes)| LangTag {
                 label: format!("{} ({:.0}%)", language, percent(*bytes)),
                 color: icons::language_color(language),
+                href: format!("/?language={}", url_encode(language)),
+                title: format!("Toon alle projecten in {language}"),
             })
             .collect(),
     }
@@ -698,94 +810,270 @@ fn commit_graph(ca: &Value) -> CommitGraph {
     }
 }
 
-fn dependencies_section(deps: &Value) -> DepsSection {
-    let managers = get_array(deps, "packageManagers");
-    if !get_bool(deps, "available") || managers.map(|m| m.is_empty()).unwrap_or(true) {
-        return DepsSection {
-            available: false,
-            rows: Vec::new(),
-            has_top: false,
-            hint: String::new(),
-            top_rows: Vec::new(),
-        };
+/// Bouwt de dependency-sectie: één tab per package manager ("N direct +
+/// M transitief", kwetsbare ecosystemen vooraan met een rood bolletje met het
+/// aantal unieke OSV-advisories) met daaronder, per package manager, de
+/// directe dependencies die de meeste transitieve dependencies binnenhalen —
+/// de ingest levert per ecosysteem al de top 20 (zie FEATURES.md).
+fn dependencies_section(deps: &Value, compliance: &Value) -> DepsSection {
+    let empty = DepsSection {
+        available: false,
+        tabs: Vec::new(),
+        panels: Vec::new(),
+    };
+    let managers = match get_array(deps, "packageManagers") {
+        Some(m) if !m.is_empty() && get_bool(deps, "available") => m,
+        _ => return empty,
+    };
+    let top: &[Value] = get_array(deps, "topDependencies")
+        .map(Vec::as_slice)
+        .unwrap_or(&[]);
+
+    // Unieke OSV-advisories per ecosysteem, voor de rode bolletjes op de tabs.
+    let mut advisory_sets: BTreeMap<&str, HashSet<&str>> = BTreeMap::new();
+    if let Some(packages) = get_array(compliance, "vulnerablePackages") {
+        for pkg in packages {
+            let Some(ecosystem) = get_str(pkg, "ecosystem") else {
+                continue;
+            };
+            if let Some(ids) = get_array(pkg, "advisories") {
+                for id in ids.iter().filter_map(|a| a.as_str()) {
+                    advisory_sets.entry(ecosystem).or_default().insert(id);
+                }
+            }
+        }
     }
 
-    let rows: Vec<DepRow> = managers
-        .unwrap_or(&Vec::new())
+    let mut tabs: Vec<DepTab> = managers
         .iter()
         .map(|pm| {
+            let ecosystem = get_str(pm, "ecosystem").unwrap_or_default().to_string();
             let count = get_u64(pm, "count");
-            DepRow {
-                label: ecosystem_label(get_str(pm, "ecosystem")),
-                text: if count == 1 {
-                    "1 dependency".to_string()
+            let direct = get_u64(pm, "directCount");
+            let advisories = advisory_sets
+                .get(ecosystem.as_str())
+                .map_or(0, |s| s.len() as u64);
+            let has_top = top
+                .iter()
+                .any(|d| get_str(d, "ecosystem") == Some(ecosystem.as_str()));
+            let mut title = format!("{count} packages in totaal");
+            if !has_top {
+                title.push_str(" — Geen directe dependencies bekend voor deze package manager");
+            }
+            DepTab {
+                ecosystem: ecosystem.clone(),
+                label: ecosystem_label(Some(&ecosystem)),
+                direct,
+                transitive: count.saturating_sub(direct),
+                advisories,
+                vulns_title: if advisories == 1 {
+                    "1 bekende kwetsbaarheid".to_string()
                 } else {
-                    format!("{} dependencies", count)
+                    format!("{advisories} bekende kwetsbaarheden")
                 },
+                disabled: !has_top,
+                selected: false,
+                title,
             }
         })
         .collect();
-
-    let top: &[Value] = get_array(deps, "topDependencies").map(Vec::as_slice).unwrap_or(&[]);
-    if top.is_empty() {
-        return DepsSection {
-            available: true,
-            rows,
-            has_top: false,
-            hint: String::new(),
-            top_rows: Vec::new(),
-        };
+    // Ecosystemen met bekende kwetsbaarheden vooraan (meeste eerst).
+    tabs.sort_by(|a, b| {
+        b.advisories
+            .cmp(&a.advisories)
+            .then_with(|| a.ecosystem.cmp(&b.ecosystem))
+    });
+    // De eerste package manager met directe dependencies is voorgeselecteerd.
+    if let Some(first) = tabs.iter().position(|t| !t.disabled) {
+        tabs[first].selected = true;
     }
 
-    let direct_count = get_u64(deps, "directDependencyCount") as usize;
-    let total = if direct_count > 0 { direct_count } else { top.len() };
-    let hint = if total > top.len() {
-        format!(
-            "Top {} van {} directe dependencies, gesorteerd op het aantal dependencies dat ze zelf binnenhalen.",
-            top.len(),
-            total
-        )
-    } else {
-        format!(
-            "Alle {} directe dependencies, gesorteerd op het aantal dependencies dat ze zelf binnenhalen.",
-            total
-        )
-    };
+    let mut panels: Vec<DepPanel> = Vec::new();
+    for tab in tabs.iter().filter(|t| !t.disabled) {
+        let mut rows: Vec<(String, u64)> = top
+            .iter()
+            .filter(|d| get_str(d, "ecosystem") == Some(tab.ecosystem.as_str()))
+            .map(|d| {
+                let name = match get_str(d, "version") {
+                    Some(version) => {
+                        format!("{} {}", get_str(d, "name").unwrap_or_default(), version)
+                    }
+                    None => get_str(d, "name").unwrap_or_default().to_string(),
+                };
+                (name, get_u64(d, "transitiveCount"))
+            })
+            .collect();
+        rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 
-    let max_count = top
-        .iter()
-        .map(|d| get_u64(d, "transitiveCount"))
-        .max()
-        .unwrap_or(1)
-        .max(1) as f64;
+        let shown = rows.len();
+        let total = if tab.direct > 0 {
+            tab.direct as usize
+        } else {
+            shown
+        };
+        let hint = if total > shown {
+            format!("Top {shown} van {total} directe dependencies, gesorteerd op het aantal dependencies dat ze zelf binnenhalen.")
+        } else {
+            format!("Alle {total} directe dependencies, gesorteerd op het aantal dependencies dat ze zelf binnenhalen.")
+        };
 
-    let top_rows: Vec<DepTopRow> = top
-        .iter()
-        .map(|dep| {
-            let count = get_u64(dep, "transitiveCount");
-            let name = match get_str(dep, "version") {
-                Some(version) => format!("{} {}", get_str(dep, "name").unwrap_or_default(), version),
-                None => get_str(dep, "name").unwrap_or_default().to_string(),
-            };
-            DepTopRow {
-                name,
-                ecosystem_label: ecosystem_label(get_str(dep, "ecosystem")),
-                width: format!("{:.2}", (count as f64 / max_count) * 100.0),
-                text: if count == 1 {
-                    "1 transitieve dependency".to_string()
-                } else {
-                    format!("{} transitieve dependencies", count)
-                },
-            }
-        })
-        .collect();
+        let max_count = rows.iter().map(|(_, c)| *c).max().unwrap_or(1).max(1) as f64;
+        panels.push(DepPanel {
+            ecosystem: tab.ecosystem.clone(),
+            heading: format!(
+                "Directe {}-dependencies met de meeste transitieve dependencies",
+                tab.label
+            ),
+            hint,
+            rows: rows
+                .iter()
+                .map(|(name, count)| DepTopRow {
+                    name: name.clone(),
+                    width: format!("{:.2}", (*count as f64 / max_count) * 100.0),
+                    text: if *count == 1 {
+                        "1 transitieve dependency".to_string()
+                    } else {
+                        format!("{count} transitieve dependencies")
+                    },
+                })
+                .collect(),
+        });
+    }
 
     DepsSection {
         available: true,
-        rows,
-        has_top: true,
-        hint,
-        top_rows,
+        tabs,
+        panels,
+    }
+}
+
+/// Bouwt de repositoryregels-sectie uit de `compliance`-data van de ingest:
+/// een samenvattingsregel ("N van M regels voldaan · X fouten · Y
+/// waarschuwingen") gevolgd door één rij per regel, overtredingen bovenaan —
+/// fouten vóór waarschuwingen (zie FEATURES.md). De kwetsbaarheidsregel
+/// vouwt open naar de kwetsbare packages met hun OSV-advisorylinks.
+fn rules_section(compliance: &Value) -> RulesSection {
+    let empty = RulesSection {
+        available: false,
+        summary: String::new(),
+        checks: Vec::new(),
+    };
+    let checks_json = match get_array(compliance, "checks") {
+        Some(c) if !c.is_empty() && get_bool(compliance, "available") => c,
+        _ => return empty,
+    };
+
+    let vulnerable: Vec<VulnerablePackage> = get_array(compliance, "vulnerablePackages")
+        .map(|packages| {
+            packages
+                .iter()
+                .map(|pkg| {
+                    let name = match get_str(pkg, "version") {
+                        Some(version) => {
+                            format!("{} {}", get_str(pkg, "name").unwrap_or_default(), version)
+                        }
+                        None => get_str(pkg, "name").unwrap_or_default().to_string(),
+                    };
+                    VulnerablePackage {
+                        name,
+                        advisories: get_array(pkg, "advisories")
+                            .map(|ids| {
+                                ids.iter()
+                                    .filter_map(|id| id.as_str())
+                                    .map(|id| AdvisoryLink {
+                                        id: id.to_string(),
+                                        url: format!(
+                                            "https://osv.dev/vulnerability/{}",
+                                            url_encode(id)
+                                        ),
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default(),
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut checks: Vec<RuleCheck> = checks_json
+        .iter()
+        .map(|check| {
+            let severity = get_str(check, "severity").unwrap_or("warning");
+            let passed = check.get("passed").and_then(|p| p.as_bool());
+            let (modifier, icon, status_text) = match passed {
+                Some(true) => ("pass", "✓", "Voldaan"),
+                None => ("unknown", "?", "Onbekend"),
+                Some(false) if severity == "error" => ("error", "✕", "Fout"),
+                Some(false) => ("warning", "!", "Waarschuwing"),
+            };
+            let is_vulnerability = get_str(check, "id") == Some("VULNERABILITY_IN_DEPENDENCY");
+            let vulnerable = if is_vulnerability {
+                vulnerable.clone()
+            } else {
+                Vec::new()
+            };
+            let vulnerable_summary = if is_vulnerability {
+                if vulnerable.len() == 1 {
+                    "1 kwetsbaar package".to_string()
+                } else {
+                    format!("{} kwetsbare packages", vulnerable.len())
+                }
+            } else {
+                String::new()
+            };
+            RuleCheck {
+                modifier: modifier.to_string(),
+                icon: icon.to_string(),
+                label: get_str(check, "label").unwrap_or_default().to_string(),
+                status_text: status_text.to_string(),
+                has_vulnerable: is_vulnerability && !vulnerable.is_empty(),
+                vulnerable,
+                vulnerable_summary,
+            }
+        })
+        .collect();
+
+    // Overtredingen bovenaan: fouten vóór waarschuwingen, dan onbekend, dan
+    // voldaan.
+    fn rank(check: &RuleCheck) -> u8 {
+        match check.modifier.as_str() {
+            "error" => 0,
+            "warning" => 1,
+            "unknown" => 2,
+            _ => 3,
+        }
+    }
+    checks.sort_by_key(rank);
+
+    let passed_count = checks.iter().filter(|c| c.modifier == "pass").count();
+    let errors = checks.iter().filter(|c| c.modifier == "error").count();
+    let warnings = checks.iter().filter(|c| c.modifier == "warning").count();
+    let mut summary = format!("{} van {} regels voldaan", passed_count, checks.len());
+    let mut parts = Vec::new();
+    if errors > 0 {
+        parts.push(if errors == 1 {
+            "1 fout".to_string()
+        } else {
+            format!("{errors} fouten")
+        });
+    }
+    if warnings > 0 {
+        parts.push(if warnings == 1 {
+            "1 waarschuwing".to_string()
+        } else {
+            format!("{warnings} waarschuwingen")
+        });
+    }
+    if !parts.is_empty() {
+        summary.push_str(" · ");
+        summary.push_str(&parts.join(" · "));
+    }
+
+    RulesSection {
+        available: true,
+        summary,
+        checks,
     }
 }
 
@@ -814,7 +1102,7 @@ pub fn project_context(data: &Value, project: &Value) -> Context {
             .iter()
             .map(|tag| TagChip {
                 label: tag.clone(),
-                href: tags_url(&[tag.clone()]),
+                href: catalog_url(&[tag.clone()], &[]),
                 active: false,
                 count: None,
             })
@@ -826,7 +1114,8 @@ pub fn project_context(data: &Value, project: &Value) -> Context {
             panel(&activity["olderThan12Months"], "Ouder dan 12 maanden"),
         ],
         commit_graph: commit_graph(&project["commitActivity"]),
-        dependencies: dependencies_section(&project["dependencies"]),
+        dependencies: dependencies_section(&project["dependencies"], &project["compliance"]),
+        rules: rules_section(&project["compliance"]),
         has_contacts: !get_array(project, "contacts").map(|c| c.is_empty()).unwrap_or(true),
         contacts: get_array(project, "contacts")
             .map(|cs| {
@@ -847,3 +1136,132 @@ pub fn project_context(data: &Value, project: &Value) -> Context {
     context.insert("p", &detail);
     context
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use tera::Tera;
+
+    fn tera() -> Tera {
+        Tera::new(&format!(
+            "{}/../templates/**/*.html",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .expect("templates konden niet geladen worden")
+    }
+
+    fn project(slug: &str, languages: Value) -> Value {
+        json!({
+            "slug": slug,
+            "name": slug,
+            "org": "Voorbeeldorganisatie",
+            "repoUrl": "https://github.com/voorbeeld/org",
+            "description": "Beschrijving",
+            "tags": ["demo"],
+            "hasPubliccode": true,
+            "softwareType": "frontend",
+            "developmentStatus": "beta",
+            "license": "EUPL-1.2",
+            "primaryLanguage": "Rust",
+            "languages": languages,
+            "contacts": [],
+            "activity": {
+                "last6Months": { "contributors": [], "prsClosed": 0 },
+                "months6to12": { "contributors": [], "prsClosed": 0 },
+                "olderThan12Months": { "contributors": [], "prsClosed": 0 }
+            },
+            "commitActivity": { "available": false },
+            "dependencies": {
+                "available": true,
+                "packageManagers": [
+                    { "ecosystem": "npm", "count": 30, "directCount": 12 },
+                    { "ecosystem": "cargo", "count": 8, "directCount": 8 }
+                ],
+                "topDependencies": [
+                    { "name": "left-pad", "version": "1.0.0", "ecosystem": "npm", "transitiveCount": 5 },
+                    { "name": "serde", "version": "1.0.210", "ecosystem": "cargo", "transitiveCount": 2 }
+                ],
+                "directDependencyCount": 20
+            },
+            "compliance": {
+                "available": true,
+                "checks": [
+                    { "id": "VULNERABILITY_IN_DEPENDENCY", "label": "Geen bekende kwetsbaarheden in dependencies", "severity": "warning", "passed": false },
+                    { "id": "MISSING_README_FILE", "label": "README.md aanwezig", "severity": "error", "passed": true },
+                    { "id": "MISSING_LICENSE_FILE", "label": "LICENSE aanwezig", "severity": "error", "passed": false }
+                ],
+                "vulnerablePackages": [
+                    { "name": "left-pad", "version": "1.0.0", "ecosystem": "npm", "advisories": ["GHSA-1234"] }
+                ]
+            }
+        })
+    }
+
+    fn data() -> Value {
+        json!({
+            "generatedAt": "2026-11-09T10:00:00Z",
+            "projects": [
+                project("demo", json!({ "Rust": 900, "Shell": 100 })),
+                project("pydemo", json!({ "Python": 500 }))
+            ]
+        })
+    }
+
+    fn render(template: &str, context: &Context) -> String {
+        tera().render(template, context).expect("renderfout")
+    }
+
+    #[test]
+    fn catalog_rendert_taalfilter_en_filtert_server_side() {
+        let data = data();
+        let context = catalog_context(&data, &[], &["Rust".to_string()]);
+        let html = render("index.html", &context);
+
+        // Alleen het Rust-project is geresulteerd en de taal staat aangevinkt.
+        assert!(html.contains("demo"));
+        assert!(!html.contains("pydemo"));
+        assert!(html.contains("value=\"Rust\""));
+        assert!(html.contains("checked"));
+        // Kaarten dragen hun talen als data-attribuut voor de JS-filterlaag.
+        assert!(html.contains("data-languages="));
+        // Zoekveld en toon-meer-knop zijn server-side aanwezig (verborgen).
+        assert!(html.contains("checkbox-filter__search"));
+        assert!(html.contains("checkbox-filter__no-matches"));
+    }
+
+    #[test]
+    fn project_renderst_dependencytabs_en_repositoryregels() {
+        let data = data();
+        let project = find_project(&data, "demo").expect("project");
+        let context = project_context(&data, project);
+        let html = render("project.html", &context);
+
+        // Tabs: "12 direct + 18 transitief", npm vooraan (kwetsbaar) en
+        // voorgeselecteerd, kwetsbaarheidsbolletje met het aantal advisories.
+        assert!(html.contains("12 direct"));
+        assert!(html.contains("+ 18 transitief"));
+        assert!(html.contains("aria-pressed=\"true\""));
+        assert!(html.contains("dependency-row__vulns"));
+        assert!(html.contains("1 bekende kwetsbaarheid"));
+        // Beide ecosystemen hebben directe dependencies, dus twee panelen.
+        assert_eq!(html.matches("dependency-list__top\" data-ecosystem").count(), 2);
+
+        // Repositoryregels: samenvatting en rijen, fouten vóór waarschuwingen.
+        assert!(html.contains("1 van 3 regels voldaan"));
+        assert!(html.contains("1 fout"));
+        assert!(html.contains("1 waarschuwing"));
+        assert!(html.contains("repository-rule--warning"));
+        assert!(html.contains("repository-rule--error"));
+        // Kwetsbaar package met OSV-link onder de kwetsbaarheidsregel. Tera
+        // escapet `/` in attributen als `&#x2F;`; de browser decodeert dat.
+        assert!(html.contains("left-pad 1.0.0"));
+        assert!(html.contains("osv.dev&#x2F;vulnerability&#x2F;GHSA-1234"));
+        assert!(html.contains(">GHSA-1234</a"));
+
+        // Taal-labels linken naar de gefilterde catalogus.
+        assert!(html.contains("?language=Rust"));
+        assert!(html.contains("Toon alle projecten in Rust"));
+    }
+}
+

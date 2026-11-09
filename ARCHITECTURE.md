@@ -31,6 +31,17 @@
   - https://github.com/GemeenteNijmegen/design-system
   - https://github.com/GemeenteNijmegen/mijn-nijmegen
   - https://github.com/GemeenteNijmegen/mule-infra
+  - https://github.com/wigo4it/wigo4it-multitenant
+  - https://github.com/kadaster/BRK-bevragen
+  - https://github.com/kadaster/WOZ-bevragen
+- **Repositoryregels**: projecten worden getoetst aan de regels uit
+  [developer-overheid-nl/ort-config](https://github.com/developer-overheid-nl/ort-config)
+  (`evaluator.rules.kts`). In de PoC draaien we geen ORT zelf; de ingest bouwt
+  dezelfde regels na: bestandsaanwezigheid via de GitHub git-trees-API (root,
+  `.github/` en `docs/`), kwetsbaarheden via de
+  [OSV batch-API](https://google.github.io/osv.dev/post-v1-querybatch/) op de
+  packages uit de SBOM, net als ORT's Advisor. Alleen exacte versies worden
+  bevraagd (versiebereiken uit manifests zonder lockfile worden overgeslagen).
 - **Metadatastandaard**: projectmetadata volgt de
   [publiccode.yml](https://yml.publiccode.tools/) standaard.
   - Schema: https://yml.publiccode.tools/v0/schema.core.html
