@@ -94,9 +94,10 @@ project.
   een leeg of misleidend aantal.
 
 **Notities / open vragen**
-- **Besloten (PoC-implementatie):** berekend tijdens ingest-tijd via GitHub's
-  dependency-graph/SBOM-endpoint (`/repos/{owner}/{repo}/dependency-graph/sbom`),
-  gegroepeerd per ecosysteem (npm, pip, Cargo, GitHub Actions, …).
+- **Besloten (PoC-implementatie):** berekend tijdens de ingest-achtergrondtaak
+  van de backend, via GitHub's dependency-graph/SBOM-endpoint
+  (`/repos/{owner}/{repo}/dependency-graph/sbom`), gegroepeerd per ecosysteem
+  (npm, pip, Cargo, GitHub Actions, …).
 - **Besloten (PoC-implementatie):** directe en transitieve dependencies worden
   gecombineerd getoond als één totaal per package manager (de SBOM maakt dit
   onderscheid niet expliciet beschikbaar).
@@ -200,15 +201,16 @@ krijg van hoe actief het project is en of die activiteit toe- of afneemt.
 
 **Notities / open vragen**
 - **Besloten (PoC-implementatie):** data komt uit de GitHub Pulls-API
-  (`state=closed`), periodiek ingelezen tijdens ingest-tijd (niet live).
+  (`state=closed`), periodiek ingelezen tijdens de ingest-achtergrondtaak van
+  de backend (niet live).
 - **Besloten (PoC-implementatie):** een "contributor" in een periode is de auteur
   van een PR die in die periode gesloten is (commit-auteurs zonder PR en
   reviewers tellen niet apart mee) — dit dekt niet elk mogelijk werkproces, maar
   is een pragmatische, met de GitHub API goed te bepalen definitie.
 - **Besloten (PoC-implementatie):** periodegrenzen zijn op dagbasis: 182 dagen
   voor "laatste 6 maanden", 365 dagen voor de 12-maandsgrens.
-- **Besloten (PoC-implementatie):** het ingest-script slaat per contributor ook
-  de GitHub-login en avatar-URL op (niet alleen het aantal), zodat de
+- **Besloten (PoC-implementatie):** de backend slaat per contributor ook de
+  GitHub-login en avatar-URL op (niet alleen het aantal), zodat de
   detailpagina per periode een avatar-stack kan tonen; alle contributors van
   de periode worden getoond (geen afkapping/"+N"-indicator), de rij wraait
   naar een volgende regel binnen het vlak wanneer nodig.
@@ -226,8 +228,8 @@ krijg van hoe actief het project is en of die activiteit toe- of afneemt.
   branch hij is gebaseerd (de default branch van de repository — niet elk
   project gebruikt hiervoor `main`; het Amsterdam design-system-project
   gebruikt bijvoorbeeld `develop`). Bron: GitHub's
-  `stats/commit_activity`-endpoint (dagelijkse granulariteit), tijdens
-  ingest-tijd opgehaald. Is deze data niet beschikbaar (GitHub moet de
+  `stats/commit_activity`-endpoint (dagelijkse granulariteit), tijdens de
+  ingest-achtergrondtaak opgehaald. Is deze data niet beschikbaar (GitHub moet de
   statistiek soms nog berekenen, of de repository is te groot), dan toont de
   detailpagina dit duidelijk in plaats van een lege of misleidende kalender.
 - **Besloten (PoC-implementatie):** PR's gesloten door bot-accounts (bijv.
@@ -292,7 +294,7 @@ en/of onderhoudt, en snel projecten van een specifieke organisatie kan vinden.
   deze feature. Als deze niet beschikbaar is, hardcoden we het in de data.
 - **Bevindingen (PoC-implementatie):** geen van de zes gecureerde projecten had
   dit veld ingevuld in hun `publiccode.yml` — de organisatienaam is voor alle zes
-  hardcoded in het ingest-script, gebaseerd op de repository-eigenaar.
+  hardcoded in de backend, gebaseerd op de repository-eigenaar.
 - **Besloten (PoC-implementatie):** het organisatiefilter is meerkeuze
   (checkboxes, OF-logica binnen dit filter), naar hetzelfde patroon als het
   ontwikkelstatus-filter.
@@ -314,8 +316,9 @@ hoe actief het project releasematig is.
 - Bron: waarschijnlijk GitHub's releases-API
   (`/repos/{owner}/{repo}/releases`), naar hetzelfde patroon als andere
   GitHub-gebaseerde features in deze catalogus (zie
-  [ARCHITECTURE.md](./ARCHITECTURE.md)) — nog niet besloten of dit tijdens
-  ingest-tijd wordt opgehaald of live.
+  [ARCHITECTURE.md](./ARCHITECTURE.md)) — nog niet besloten of dit tijdens de
+  ingest-achtergrondtaak wordt opgehaald of live bij het renderen van de
+  detailpagina.
 - Nog niet besloten: wat te tonen bij een project zonder GitHub-releases maar
   wel met git-tags, en of release-notes/changelog-tekst wordt meegenomen of
   alleen versie + datum.

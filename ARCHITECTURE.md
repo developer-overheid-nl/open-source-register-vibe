@@ -43,24 +43,42 @@
   - Vlaggen: inspiratie hiervoor zoeken we in de Rijkshuisstijl Community
     flag icon set:
     https://rijkshuisstijl-community.vercel.app/?path=/story/rhc-templates-flag-icon-set--default
-- **Frontend-aanpak**: vanilla JavaScript, geen framework.
-  - ES modules (`<script type="module">`); elk component krijgt zijn eigen
-    `.js`-bestand dat een render/mount-functie exporteert, geïmporteerd in een
-    hoofdbestand (bijv. `app.js`).
-  - Markup per component staat als `<template>`-element in `index.html` (met een
-    `id`); de component-JS haalt dit op via `document.getElementById`, kloont het
-    (`cloneNode`) en vult het met data.
+- **Backend**: één Rust-binary draait de volledige applicatie — geen los
+  ingest-script en geen statisch JSON-bestand meer (`web/data/projects.json`
+  vervalt). Als webframework gebruiken we [Axum](https://github.com/tokio-rs/axum).
+  - **Data-ingest** gebeurt als achtergrondtaak binnen dezelfde backend: bij
+    opstarten en daarna periodiek bevraagt de backend de GitHub API
+    (publiccode.yml, contributors, PR's, talen, dependencies) voor de
+    gecureerde projecten. Het resultaat blijft in-memory; een database of
+    ander opslagformaat is een mogelijke latere stap.
+  - De GitHub-token komt uit de omgeving (`GITHUB_TOKEN`, of `gh auth login`)
+    om rate-limiting te voorkomen.
+  - Er wordt nooit live vanuit de browser naar GitHub gecalled — al het
+    GitHub-verkeer loopt via de backend (voorkomt rate-limit- en
+    tokenproblemen).
+  - Voorgestelde repo-indeling: `server/` (Rust-crate: Axum-backend, routes en
+    ingest-achtergrondtaak), `templates/` (templates/partialen voor pagina's
+    en componenten) en `web/` (statische assets: JS-modules en CSS).
+- **Frontend-aanpak**: server-side rendering met progressive enhancement in
+  vanilla JavaScript (geen framework).
+  - De backend rendert alle pagina's en componenten (inclusief zoekbalk,
+    filters en sorteerselectie) server-side met een template-engine (bijv.
+    [Tera](https://tera.netlify.app/) of
+    [Askama](https://askama.readthedocs.io/)). Componentmarkup staat als
+    template-partial — naar het patroon van de huidige
+    `<template>`-blokken — gevuld door de server in plaats van door de browser.
+  - Zonder JavaScript tonen de pagina's de volledige projectenlijst en alle
+    detailinformatie. De JS-laag (ES modules, `<script type="module">`)
+    verrijkt de gerenderde DOM daarna: live zoeken, filteren en sorteren
+    gebeurt client-side op de aanwezige elementen (filterdata staat in
+    `data-*`-attributen), niet door data te fetchen.
+  - Er is geen JSON-API en de frontend fetcht geen data: alle data verlaat de
+    backend als gerenderde HTML.
   - Styling per component in een eigen CSS-bestand, met class-namen geprefixt op
     de componentnaam (bijv. `project-card.css` met `.project-card`,
     `.project-card__tag`) — geen echte scoping (geen Shadow DOM), maar een
     naamgevingsafspraak om stijlconflicten te voorkomen.
-- **Backend / data-ingest**: geen live backend-server. Een los ingest-script in
-  Rust bevraagt periodiek/handmatig de GitHub API (publiccode.yml, contributors,
-  PR's, talen, dependencies) voor de gecureerde projecten en schrijft het
-  resultaat weg naar een statisch JSON-bestand (bijv. `data/projects.json`). De
-  vanilla JS-frontend fetcht alleen dat statische bestand; er wordt nooit live
-  naar GitHub gecalled vanuit de browser (voorkomt rate-limit- en tokenproblemen).
-- **Pagina's**:
-  - Catalogus browse-/lijstpagina — toont alle projecten.
-  - Projectdetailpagina — één per project, bereikbaar door op een item in de lijst
-    te klikken, met alle informatie over dat project.
+- **Pagina's** (gerouteerd en gerenderd door de backend):
+  - Catalogus browse-/lijstpagina (`/`) — toont alle projecten.
+  - Projectdetailpagina (`/project/{slug}`) — één per project, bereikbaar door
+    op een item in de lijst te klikken, met alle informatie over dat project.

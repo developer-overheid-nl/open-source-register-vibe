@@ -6,4 +6,4 @@ willen implementeren.
 
 Zie [FEATURES.md](./FEATURES.md) voor featurespecificaties (user stories en
 acceptatiecriteria) en [ARCHITECTURE.md](./ARCHITECTURE.md) voor architectuurdetails
-(databronnen, metadatastandaard, pagina's).
+(backend, databronnen, metadatastandaard, pagina's).
