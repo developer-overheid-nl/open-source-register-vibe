@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block head_extra %}<meta http-equiv="refresh" content="5" />{% endblock head_extra %}
+{% block content %}
+<main class="page">
+  <div class="empty-state">
+    <p class="empty-state__message">De catalogus-data wordt bij GitHub opgehaald…</p>
+    <p class="empty-state__hint">
+      Bij de eerste start duurt dit een paar minuten. Deze pagina herlaadt
+      automatisch zodra de eerste data binnen is.
+    </p>
+  </div>
+</main>
+{% endblock content %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Project niet gevonden — Open Source Catalogus{% endblock title %}
+{% block styles %}<link rel="stylesheet" href="/static/components/empty-state.css" />{% endblock styles %}
+{% block content %}
+<main class="page">
+  <p><a href="/">← Terug naar overzicht</a></p>
+  <div class="empty-state">
+    <p class="empty-state__message">Project niet gevonden.</p>
+    <p class="empty-state__hint"><a href="/">Terug naar het overzicht</a></p>
+  </div>
+</main>
+{% endblock content %}

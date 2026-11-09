@@ -1,219 +1,193 @@
-import { mountSearchBar } from "./components/search-bar.js";
-import { mountSortSelect } from "./components/sort-select.js";
-import { mountTagFilter } from "./components/tag-filter.js";
-import { mountCheckboxFilter } from "./components/checkbox-filter.js";
-import { renderProjectList } from "./components/project-list.js";
+/**
+ * Progressive enhancement for the catalog page. The server already rendered
+ * the complete page — filters, sort select, project cards with data-*
+ * attributes, empty state — so this script never fetches data; it only wires
+ * the interactive behavior (live search, filtering, sorting) onto that DOM.
+ * Tag chips/pills are real links (`/?tag=…`) that also work without JS; here
+ * we intercept their clicks to filter instantly without a page load.
+ */
+
+const DEBOUNCE_MS = 250;
+const VISIBLE_TAG_LIMIT = 15;
+
+const listEl = document.getElementById("project-list-cards");
+const emptyState = document.getElementById("empty-state");
+const tagListEl = document.getElementById("tag-filter-list");
+const pillsEl = document.getElementById("active-tag-pills");
+
+const cards = Array.from((listEl ?? document).querySelectorAll("li.project-card")).map((el) => ({
+  el,
+  search: el.dataset.search ?? "",
+  tags: JSON.parse(el.dataset.tags || "[]"),
+  status: el.dataset.status || "",
+  org: el.dataset.org || "",
+  type: el.dataset.softwareType || "",
+  name: el.dataset.name || "",
+  commits: Number(el.dataset.commits || 0),
+  contributors: Number(el.dataset.contributors || 0),
+  dependencies: Number(el.dataset.dependencies || 0),
+}));
+
+const params = new URLSearchParams(window.location.search);
 
 const state = {
-  projects: [],
   query: "",
-  activeTags: new Set(),
-  activeStatuses: new Set(),
-  activeOrgs: new Set(),
-  activeSoftwareTypes: new Set(),
+  tags: new Set(params.getAll("tag").filter(Boolean)),
+  statuses: new Set(),
+  orgs: new Set(),
+  softwareTypes: new Set(),
   sort: "name-asc",
 };
 
-let tagFilterHandle = null;
+const compareName = (a, b) => a.name.localeCompare(b.name);
+const SORTERS = {
+  "name-asc": compareName,
+  "commits-desc": (a, b) => b.commits - a.commits || compareName(a, b),
+  "commits-asc": (a, b) => a.commits - b.commits || compareName(a, b),
+  "contributors-desc": (a, b) => b.contributors - a.contributors || compareName(a, b),
+  "contributors-asc": (a, b) => a.contributors - b.contributors || compareName(a, b),
+  "dependencies-desc": (a, b) => b.dependencies - a.dependencies || compareName(a, b),
+  "dependencies-asc": (a, b) => a.dependencies - b.dependencies || compareName(a, b),
+};
 
-async function init() {
-  const response = await fetch("data/projects.json");
-  const data = await response.json();
-  state.projects = data.projects;
-
-  const params = new URLSearchParams(window.location.search);
-  const tagFromUrl = params.get("tag");
-  if (tagFromUrl) {
-    state.activeTags.add(tagFromUrl);
-  }
-
-  mountFilters();
-
-  mountSearchBar(document.getElementById("search-bar"), {
-    onChange: (query) => {
-      state.query = query.toLowerCase();
-      render();
-    },
-  });
-
-  mountSortSelect(document.getElementById("sort-select"), {
-    value: state.sort,
-    onChange: (sort) => {
-      state.sort = sort;
-      render();
-    },
-  });
-
-  render();
+function matches(card) {
+  if (state.query && !card.search.includes(state.query)) return false;
+  if (state.tags.size > 0 && ![...state.tags].every((tag) => card.tags.includes(tag))) return false;
+  if (state.statuses.size > 0 && !state.statuses.has(card.status)) return false;
+  if (state.orgs.size > 0 && !state.orgs.has(card.org)) return false;
+  if (state.softwareTypes.size > 0 && !state.softwareTypes.has(card.type)) return false;
+  return true;
 }
 
-function mountFilters() {
-  const filtersContainer = document.getElementById("filters");
-  const template = document.getElementById("tpl-filters");
-  filtersContainer.appendChild(template.content.cloneNode(true));
+function apply() {
+  let visible = 0;
+  for (const card of cards) {
+    const ok = matches(card);
+    card.el.hidden = !ok;
+    if (ok) visible += 1;
+  }
+  if (listEl) {
+    [...cards].sort(SORTERS[state.sort]).forEach((card) => listEl.appendChild(card.el));
+  }
+  emptyState.hidden = visible > 0;
+}
 
-  const tagCounts = {};
-  for (const project of state.projects) {
-    for (const tag of project.tags || []) {
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+/** Catalog URL for a set of active tags — mirrors what the server builds. */
+function tagsUrl(tags) {
+  if (tags.size === 0) return "/";
+  return "/?" + [...tags].map((tag) => `tag=${encodeURIComponent(tag)}`).join("&");
+}
+
+function createPill(tag) {
+  const pill = document.createElement("a");
+  pill.className = "tag-pill";
+  pill.dataset.tag = tag;
+  const next = new Set(state.tags);
+  next.delete(tag);
+  pill.href = tagsUrl(next);
+
+  const label = document.createElement("span");
+  label.className = "tag-pill__label";
+  label.textContent = tag;
+  const remove = document.createElement("span");
+  remove.className = "tag-pill__remove";
+  remove.setAttribute("aria-hidden", "true");
+  remove.textContent = "×";
+  pill.append(label, remove);
+  return pill;
+}
+
+/** Keeps chip state/hrefs, pills and the URL in sync with `state.tags`. */
+function syncTagUi() {
+  if (tagListEl) {
+    for (const chip of tagListEl.querySelectorAll("a.tag-chip")) {
+      const tag = chip.dataset.tag;
+      const active = state.tags.has(tag);
+      chip.classList.toggle("tag-chip--active", active);
+      const next = new Set(state.tags);
+      active ? next.delete(tag) : next.add(tag);
+      chip.href = tagsUrl(next);
+      chip.hidden = !tagsExpanded && chipIndex(chip) >= VISIBLE_TAG_LIMIT && !active;
     }
   }
-  const allTags = Object.keys(tagCounts).sort(
-    (a, b) => tagCounts[b] - tagCounts[a] || a.localeCompare(b)
-  );
-  const allStatuses = [
-    ...new Set(state.projects.map((p) => p.developmentStatus).filter(Boolean)),
-  ].sort();
-  const allOrgs = [...new Set(state.projects.map((p) => p.org).filter(Boolean))].sort();
-  const allSoftwareTypes = [
-    ...new Set(state.projects.map((p) => p.softwareType).filter(Boolean)),
-  ].sort();
+  updateToggleButton();
+  pillsEl.innerHTML = "";
+  for (const tag of state.tags) pillsEl.appendChild(createPill(tag));
+  history.replaceState(null, "", tagsUrl(state.tags));
+}
 
-  tagFilterHandle = mountTagFilter(
-    document.getElementById("tag-filter-list"),
-    document.getElementById("active-tag-pills"),
-    {
-      tags: allTags,
-      counts: tagCounts,
-      isActive: (tag) => state.activeTags.has(tag),
-      onToggle: (tag) => toggleTag(tag),
-    }
-  );
+const tagChips = tagListEl ? Array.from(tagListEl.querySelectorAll("a.tag-chip")) : [];
+const tagChipIndex = new Map(tagChips.map((chip, i) => [chip, i]));
+const chipIndex = (chip) => tagChipIndex.get(chip) ?? 0;
+let tagsExpanded = false;
+let toggleButton = null;
 
-  mountCheckboxFilter(document.getElementById("status-filter-options"), {
-    options: allStatuses,
-    isActive: (status) => state.activeStatuses.has(status),
-    onToggle: (status) => {
-      if (state.activeStatuses.has(status)) {
-        state.activeStatuses.delete(status);
-      } else {
-        state.activeStatuses.add(status);
-      }
-      render();
-    },
-  });
-
-  mountCheckboxFilter(document.getElementById("org-filter-options"), {
-    options: allOrgs,
-    isActive: (org) => state.activeOrgs.has(org),
-    onToggle: (org) => {
-      if (state.activeOrgs.has(org)) {
-        state.activeOrgs.delete(org);
-      } else {
-        state.activeOrgs.add(org);
-      }
-      render();
-    },
-  });
-
-  mountCheckboxFilter(document.getElementById("software-type-filter-options"), {
-    options: allSoftwareTypes,
-    isActive: (softwareType) => state.activeSoftwareTypes.has(softwareType),
-    onToggle: (softwareType) => {
-      if (state.activeSoftwareTypes.has(softwareType)) {
-        state.activeSoftwareTypes.delete(softwareType);
-      } else {
-        state.activeSoftwareTypes.add(softwareType);
-      }
-      render();
-    },
-  });
+function updateToggleButton() {
+  if (tagChips.length <= VISIBLE_TAG_LIMIT) return;
+  if (!toggleButton) {
+    toggleButton = document.createElement("button");
+    toggleButton.type = "button";
+    toggleButton.className = "tag-filter__toggle";
+    toggleButton.addEventListener("click", () => {
+      tagsExpanded = !tagsExpanded;
+      syncTagUi();
+    });
+    tagListEl.appendChild(toggleButton);
+  }
+  const hiddenCount = tagChips.length - VISIBLE_TAG_LIMIT;
+  toggleButton.textContent = tagsExpanded ? "Toon minder" : `Toon meer (${hiddenCount})`;
 }
 
 function toggleTag(tag) {
-  if (state.activeTags.has(tag)) {
-    state.activeTags.delete(tag);
+  if (state.tags.has(tag)) {
+    state.tags.delete(tag);
   } else {
-    state.activeTags.add(tag);
+    state.tags.add(tag);
   }
-  render();
+  syncTagUi();
+  apply();
 }
 
-function matchesQuery(project) {
-  if (!state.query) return true;
-  const haystack = [project.name, project.description, ...(project.tags || [])]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(state.query);
+function onTagClick(event) {
+  const chip = event.target.closest("a.tag-chip, a.tag-pill");
+  if (!chip) return;
+  event.preventDefault();
+  toggleTag(chip.dataset.tag);
 }
+tagListEl?.addEventListener("click", onTagClick);
+pillsEl?.addEventListener("click", onTagClick);
+document.getElementById("project-list")?.addEventListener("click", onTagClick);
 
-function matchesTags(project) {
-  if (state.activeTags.size === 0) return true;
-  const projectTags = new Set(project.tags || []);
-  return [...state.activeTags].every((tag) => projectTags.has(tag));
-}
+const searchInput = document.getElementById("search-bar-input");
+let debounceTimer = null;
+searchInput?.addEventListener("input", () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    state.query = searchInput.value.trim().toLowerCase();
+    apply();
+  }, DEBOUNCE_MS);
+});
 
-function matchesStatus(project) {
-  if (state.activeStatuses.size === 0) return true;
-  return state.activeStatuses.has(project.developmentStatus);
-}
+document.getElementById("sort-select-input")?.addEventListener("change", (event) => {
+  state.sort = event.target.value;
+  apply();
+});
 
-function matchesOrg(project) {
-  if (state.activeOrgs.size === 0) return true;
-  return state.activeOrgs.has(project.org);
-}
-
-function matchesSoftwareType(project) {
-  if (state.activeSoftwareTypes.size === 0) return true;
-  return state.activeSoftwareTypes.has(project.softwareType);
-}
-
-/** Total commits over the last 12 months, or 0 if no commit activity is known. */
-function totalCommits(project) {
-  const days = project.commitActivity?.available ? project.commitActivity.days : null;
-  if (!days) return 0;
-  return days.reduce((sum, day) => sum + day.count, 0);
-}
-
-/** All-time unique contributor count, from the union of the activity buckets. */
-function allTimeContributors(project) {
-  const buckets = ["last6Months", "months6to12", "olderThan12Months"];
-  const logins = new Set();
-  for (const bucket of buckets) {
-    for (const c of project.activity?.[bucket]?.contributors || []) {
-      logins.add(c.login);
+function wireCheckboxGroup(id, set) {
+  document.getElementById(id)?.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input.checkbox-filter__checkbox");
+    if (!checkbox) return;
+    if (checkbox.checked) {
+      set.add(checkbox.value);
+    } else {
+      set.delete(checkbox.value);
     }
-  }
-  return logins.size;
-}
-
-/** Total dependency count across all package managers, or 0 if unknown. */
-function totalDependencies(project) {
-  if (!project.dependencies?.available) return 0;
-  return project.dependencies.packageManagers.reduce((sum, pm) => sum + pm.count, 0);
-}
-
-const SORTERS = {
-  "name-asc": (a, b) => a.name.localeCompare(b.name),
-  "commits-desc": (a, b) => totalCommits(b) - totalCommits(a) || a.name.localeCompare(b.name),
-  "commits-asc": (a, b) => totalCommits(a) - totalCommits(b) || a.name.localeCompare(b.name),
-  "contributors-desc": (a, b) =>
-    allTimeContributors(b) - allTimeContributors(a) || a.name.localeCompare(b.name),
-  "contributors-asc": (a, b) =>
-    allTimeContributors(a) - allTimeContributors(b) || a.name.localeCompare(b.name),
-  "dependencies-desc": (a, b) =>
-    totalDependencies(b) - totalDependencies(a) || a.name.localeCompare(b.name),
-  "dependencies-asc": (a, b) =>
-    totalDependencies(a) - totalDependencies(b) || a.name.localeCompare(b.name),
-};
-
-function render() {
-  tagFilterHandle?.update();
-
-  const filtered = state.projects
-    .filter(
-      (project) =>
-        matchesQuery(project) &&
-        matchesTags(project) &&
-        matchesStatus(project) &&
-        matchesOrg(project) &&
-        matchesSoftwareType(project)
-    )
-    .sort(SORTERS[state.sort] || SORTERS["name-asc"]);
-
-  renderProjectList(document.getElementById("project-list"), filtered, {
-    onTagClick: (tag) => toggleTag(tag),
+    apply();
   });
 }
+wireCheckboxGroup("status-filter-options", state.statuses);
+wireCheckboxGroup("org-filter-options", state.orgs);
+wireCheckboxGroup("software-type-filter-options", state.softwareTypes);
 
-init();
+syncTagUi();
+apply();

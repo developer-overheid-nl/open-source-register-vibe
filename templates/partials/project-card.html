@@ -1,0 +1,63 @@
+<li
+  class="project-card"
+  data-search="{{ card.data_search }}"
+  data-tags="{{ card.data_tags }}"
+  data-status="{{ card.data_status }}"
+  data-org="{{ card.data_org }}"
+  data-software-type="{{ card.data_software_type }}"
+  data-name="{{ card.data_name }}"
+  data-commits="{{ card.data_commits }}"
+  data-contributors="{{ card.data_contributors }}"
+  data-dependencies="{{ card.data_dependencies }}"
+>
+  <a class="project-card__link project-card__link--head" href="{{ card.detail_url }}">
+    <div class="project-card__header">
+      <h2 class="project-card__name">{{ card.name }}</h2>
+      {% if not card.has_publiccode %}
+      <span class="project-card__warning badge" title="Geen publiccode.yml gevonden">
+        ⚠ metadata onvolledig
+      </span>
+      {% endif %}
+    </div>
+    <p class="project-card__org">{{ card.org }}</p>
+    <p class="project-card__description">{{ card.description }}</p>
+  </a>
+  {% if card.has_tags %}
+  <div class="project-card__tags">
+    {% for chip in card.tags %}{% include "partials/tag-chip.html" %}{% endfor %}
+  </div>
+  {% endif %}
+  <a class="project-card__link project-card__link--foot" href="{{ card.detail_url }}">
+    <dl class="project-card__meta">
+      <div>
+        <dt>Status</dt>
+        <dd class="project-card__status">{{ card.status }}</dd>
+      </div>
+      <div>
+        <dt>Taal</dt>
+        <dd class="project-card__language">
+          {% if card.language %}<span
+            class="project-card__language-dot"
+            style="background-color: {{ card.language_color }}"
+          ></span
+          >{{ card.language }}{% else %}onbekend{% endif %}
+        </dd>
+      </div>
+    </dl>
+    {% if card.sparkline %}
+    <div class="commit-sparkline">
+      <p class="commit-sparkline__label">{{ card.sparkline.label }}</p>
+      <svg
+        viewBox="0 0 100 30"
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="{{ card.sparkline.aria }}"
+        class="commit-sparkline__svg"
+      >
+        <path d="{{ card.sparkline.area }}" class="commit-sparkline__area"></path>
+        <path d="{{ card.sparkline.line }}" class="commit-sparkline__line"></path>
+      </svg>
+    </div>
+    {% endif %}
+  </a>
+</li>

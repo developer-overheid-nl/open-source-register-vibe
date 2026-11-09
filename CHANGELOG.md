@@ -17,12 +17,25 @@ Het formaat is gebaseerd op
 - Sorteren van dependencies.
 - Open source-bestanden: EUPL-1.2-licentie, publiccode.yml, SECURITY.md,
   CONTRIBUTING.md, CODE_OF_CONDUCT.md en REUSE-compliance.
+- Rust-backend met Axum (`server/`): haalt de GitHub-data bij opstarten en
+  daarna elke 24 uur in een achtergrondthread op, houdt het resultaat in het
+  geheugen en rendert de catalogus- en projectdetailpagina's server-side met
+  Tera-templates (`templates/`). Inclusief laadscherm tijdens de eerste
+  ingest en een "data laatst bijgewerkt"-vermelding in de footer.
 
 ### Changed
 
 - Architectuur: de losse Rust-ingest-CLI en het statische
-  `web/data/projects.json` vervallen. Er komt één Rust-backend (Axum) die de
-  GitHub-data periodiek als achtergrondtaak in-memory ophaalt, de pagina's
-  server-side rendert en de statische assets serveert; de vanilla JS-frontend
-  wordt een progressive-enhancement-laag op de gerenderde pagina's. De
-  documentatie is alvast bijgewerkt; de code volgt nog.
+  `web/data/projects.json` vervallen; één Rust-backend draait nu de volledige
+  applicatie (zie ARCHITECTURE.md).
+- De frontend-JS (`web/app.js`) is nu uitsluitend progressive enhancement op
+  de server-gerenderde DOM (live zoeken, filteren en sorteren via
+  `data-*`-attributen). Tag-chips en -pills zijn echte links (`/?tag=…`) en
+  alle pagina's tonen ook zonder JavaScript de volledige inhoud; meerkeuze
+  op tags werkt ook zonder JS (de server filtert op herhaalde `?tag=`-params).
+
+### Removed
+
+- De losse ingest-CLI en het statische `web/data/projects.json`.
+- De JSON-gebaseerde frontend: `web/index.html`, `web/project.html`,
+  `web/detail.js` en alle component-JS die data client-side renderde.

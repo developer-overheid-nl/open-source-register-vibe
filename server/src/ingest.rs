@@ -1,3 +1,9 @@
+//! Bevraagt de GitHub API voor de gecureerde projectlijst (zie
+//! ARCHITECTURE.md) en leverelt het resultaat als één `serde_json::Value`,
+//! dezelfde vorm als het vroegere `web/data/projects.json`. Draait in een
+//! aparte achtergrondthread: bij opstarten eenmalig en daarna elke 24 uur
+//! (zie `main.rs`).
+
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -83,6 +89,8 @@ const REPOS: &[(&str, &str, &str)] = &[
     ),
 ];
 
+const USER_AGENT: &str = "open-source-register-vibe-server";
+
 #[derive(Debug, Deserialize, Default)]
 struct PubliccodeYml {
     #[serde(default)]
@@ -159,7 +167,7 @@ fn api_get(
     let send = |with_auth: bool| -> Result<reqwest::blocking::Response, String> {
         let mut req = client
             .get(url)
-            .header("User-Agent", "open-source-register-vibe-ingest")
+            .header("User-Agent", USER_AGENT)
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28");
         if with_auth {
@@ -186,7 +194,7 @@ fn fetch_publiccode(client: &reqwest::blocking::Client, owner: &str, repo: &str,
     let url = format!("https://raw.githubusercontent.com/{owner}/{repo}/{branch}/publiccode.yml");
     let resp = client
         .get(&url)
-        .header("User-Agent", "open-source-register-vibe-ingest")
+        .header("User-Agent", USER_AGENT)
         .send()
         .ok()?;
     if !resp.status().is_success() {
@@ -325,7 +333,7 @@ fn fetch_commit_activity(
     };
 
     // Flatten into one entry per day (each week's `days` is Sun..Sat), so the
-    // frontend can render a GitHub-profile-style calendar heatmap of squares.
+    // commit calendar is a GitHub-profile-style grid of week columns.
     let mut days_json: Vec<Value> = Vec::new();
     for week in weeks {
         let (Some(week_ts), Some(day_counts)) = (
@@ -524,7 +532,10 @@ fn fetch_dependencies(client: &reqwest::blocking::Client, token: &Option<String>
     })
 }
 
-fn main() {
+/// Haalt alle data voor alle gecureerde projecten op en levert de volledige
+/// dataset zoals de templates die verwachten:
+/// `{ generatedAt, projects: [ { slug, name, org, … } ] }`.
+pub fn collect() -> Value {
     let token = github_token();
     if token.is_none() {
         eprintln!("warning: no GitHub token found (GITHUB_TOKEN unset, `gh auth token` unavailable) — continuing unauthenticated, expect low rate limits");
@@ -534,12 +545,18 @@ fn main() {
     let mut projects = Vec::new();
 
     for &(owner, repo, org_fallback) in REPOS {
-        eprintln!("fetching {owner}/{repo}...");
+        eprintln!("ingest: ophalen {owner}/{repo}...");
 
         let repo_url = format!("https://api.github.com/repos/{owner}/{repo}");
-        let (status, repo_info) = api_get(&client, &token, &repo_url).expect("repo info request failed");
+        let (status, repo_info) = match api_get(&client, &token, &repo_url) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("  ingest: {owner}/{repo} overgeslagen: {e}");
+                continue;
+            }
+        };
         if status != 200 {
-            eprintln!("  skipping {owner}/{repo}: repo info returned HTTP {status}");
+            eprintln!("  ingest: {owner}/{repo} overgeslagen: repo-info gaf HTTP {status}");
             continue;
         }
 
@@ -659,13 +676,10 @@ fn main() {
         }));
     }
 
-    let output = json!({
+    eprintln!("ingest: klaar — {} projecten verzameld", projects.len());
+
+    json!({
         "generatedAt": Utc::now().to_rfc3339(),
         "projects": projects,
-    });
-
-    let out_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../web/data/projects.json");
-    std::fs::write(&out_path, serde_json::to_string_pretty(&output).unwrap())
-        .expect("failed to write data/projects.json");
-    eprintln!("wrote {}", out_path.display());
+    })
 }

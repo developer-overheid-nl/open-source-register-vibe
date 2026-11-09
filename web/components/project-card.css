@@ -13,6 +13,16 @@
   color: inherit;
 }
 
+/* De kaart bevat twee links (boven en onder de tag-chips, die zelf echte
+   links zijn naar de gefilterde catalogus); verdeel de padding over beiden. */
+.project-card__link--head {
+  padding-bottom: 0;
+}
+
+.project-card__link--foot {
+  padding-top: 0.6rem;
+}
+
 .project-card:hover {
   border-color: var(--color-accent);
 }
@@ -50,7 +60,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  margin-bottom: 0.6rem;
+  padding: 0 1.25rem;
+  margin: 0.6rem 0 0;
 }
 
 .project-card__meta {

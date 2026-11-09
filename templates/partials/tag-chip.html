@@ -1,0 +1,7 @@
+<a
+  class="tag-chip{% if chip.active %} tag-chip--active{% endif %}"
+  data-tag="{{ chip.label }}"
+  href="{{ chip.href }}"
+  ><span class="tag-chip__label">{{ chip.label }}</span
+  >{% if chip.count %}<span class="tag-chip__count">{{ chip.count }}</span>{% endif %}</a
+>

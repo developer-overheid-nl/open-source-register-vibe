@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock title %}
+{% block styles %}
+<link rel="stylesheet" href="/static/components/tag-filter.css" />
+<link rel="stylesheet" href="/static/components/project-detail.css" />
+<link rel="stylesheet" href="/static/components/software-type-badge.css" />
+<link rel="stylesheet" href="/static/components/activity-panel.css" />
+<link rel="stylesheet" href="/static/components/avatar-stack.css" />
+<link rel="stylesheet" href="/static/components/commit-graph.css" />
+<link rel="stylesheet" href="/static/components/contact-list.css" />
+<link rel="stylesheet" href="/static/components/dependency-list.css" />
+<link rel="stylesheet" href="/static/components/language-list.css" />
+{% endblock styles %}
+{% block content %}
+<main class="page">
+  <p><a href="/">← Terug naar overzicht</a></p>
+  <article class="project-detail">
+    {% if not p.has_publiccode %}
+    <div class="project-detail__warning-notice badge">
+      ⚠ Geen <code>publiccode.yml</code> gevonden voor dit project — onderstaande metadata
+      is mogelijk onvolledig of niet geverifieerd.
+    </div>
+    {% endif %}
+
+    <div class="project-detail__header">
+      <div>
+        <h1 class="project-detail__name">{{ p.name }}</h1>
+        <p class="project-detail__org">{{ p.org }}</p>
+      </div>
+      <a class="project-detail__repo-link button" href="{{ p.repo_url }}" target="_blank" rel="noopener">
+        Bekijk broncode op GitHub ↗
+      </a>
+    </div>
+
+    <p class="project-detail__description">{{ p.description }}</p>
+
+    <dl class="project-detail__facts">
+      <div>
+        <dt>Softwaretype</dt>
+        <dd class="project-detail__software-type">
+          <span class="software-type-badge{% if p.software_type_unknown %} software-type-badge--unknown{% endif %}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="software-type-badge__icon">{{ p.software_type_icon | safe }}</svg>
+            <span class="software-type-badge__label">{{ p.software_type_label }}</span>
+          </span>
+        </dd>
+      </div>
+      <div>
+        <dt>Licentie</dt>
+        <dd class="project-detail__license">{{ p.license }}</dd>
+      </div>
+      <div>
+        <dt>Organisatie</dt>
+        <dd class="project-detail__org-fact">{{ p.org }}</dd>
+      </div>
+    </dl>
+
+    {% if p.has_tags %}
+    <div class="project-detail__tags">
+      {% for chip in p.tags %}{% include "partials/tag-chip.html" %}{% endfor %}
+    </div>
+    {% endif %}
+
+    <section class="project-detail__section">
+      <h2>Programmeertalen</h2>
+      <div class="language-list" id="language-list">
+        {% if p.languages.has_any %}
+        <div class="language-list__bar" role="img" aria-label="{{ p.languages.bar_aria }}">
+          {% for seg in p.languages.segments %}<span
+            class="language-list__bar-segment"
+            style="width: {{ seg.width }}%; background-color: {{ seg.color }}"
+            title="{{ seg.title }}"
+          ></span>{% endfor %}
+        </div>
+        <div class="language-list__tags">
+          {% for tag in p.languages.tags %}<span class="language-tag"
+            ><span class="language-tag__dot" style="background-color: {{ tag.color }}"></span
+            >{{ tag.label }}</span
+          >{% endfor %}
+        </div>
+        {% else %}
+        <p class="language-list__empty">Geen detecteerbare programmeertaal gevonden voor dit project.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="project-detail__section">
+      <h2>Contributor- en PR-activiteit</h2>
+      <div class="activity-panels" id="activity-panels">
+        {% for panel in p.panels %}
+        <div class="activity-panel">
+          <h3 class="activity-panel__label">{{ panel.label }}</h3>
+          <div class="activity-panel__avatars avatar-stack">
+            {% for a in panel.avatars %}<img
+              class="avatar-stack__avatar"
+              src="{{ a.avatar_url }}"
+              alt="{{ a.login }}"
+              title="{{ a.login }}"
+              loading="lazy"
+            />{% endfor %}
+          </div>
+          <p class="activity-panel__stat">
+            <span class="activity-panel__value activity-panel__contributors">{{ panel.contributors }}</span>
+            contributors
+          </p>
+          <p class="activity-panel__stat">
+            <span class="activity-panel__value activity-panel__prs">{{ panel.prs }}</span>
+            PR's gesloten
+          </p>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="commit-graph" id="commit-graph">
+        {% if p.commit_graph.available %}
+        <p class="commit-graph__label">
+          {{ p.commit_graph.total }} commits in de laatste 12 maanden, op branch
+          <code class="commit-graph__branch">{{ p.commit_graph.branch }}</code>
+        </p>
+        <div class="commit-graph__scroller">
+          <div class="commit-graph__grid" role="img" aria-label="{{ p.commit_graph.aria }}">
+            {% for week in p.commit_graph.weeks %}
+            <div class="commit-graph__week">
+              {% if week.month_label %}<span class="commit-graph__month-label">{{ week.month_label }}</span>{% endif %}
+              {% for day in week.days %}<span
+                class="commit-graph__day commit-graph__day--level-{{ day.level }}"
+                title="{{ day.title }}"
+              ></span>{% endfor %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="commit-graph__legend">
+          <span>Minder</span>
+          <span class="commit-graph__day commit-graph__day--level-0"></span>
+          <span class="commit-graph__day commit-graph__day--level-1"></span>
+          <span class="commit-graph__day commit-graph__day--level-2"></span>
+          <span class="commit-graph__day commit-graph__day--level-3"></span>
+          <span class="commit-graph__day commit-graph__day--level-4"></span>
+          <span>Meer</span>
+        </div>
+        {% else %}
+        <p class="commit-graph__empty-state">Geen commit-activiteit beschikbaar voor dit project.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="project-detail__section">
+      <h2>Package managers &amp; dependencies</h2>
+      <div class="dependency-list" id="dependency-list">
+        {% if p.dependencies.available %}
+        <div class="dependency-list__summary">
+          {% for row in p.dependencies.rows %}
+          <div class="dependency-row">
+            <span class="dependency-row__ecosystem">{{ row.label }}</span>
+            <span class="dependency-row__count">{{ row.text }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% if p.dependencies.has_top %}
+        <div class="dependency-list__top">
+          <h3 class="dependency-list__top-heading">Directe dependencies met de meeste transitieve dependencies</h3>
+          <p class="dependency-list__top-hint">{{ p.dependencies.hint }}</p>
+          <ol class="dependency-list__top-rows">
+            {% for row in p.dependencies.top_rows %}
+            <li class="dependency-top-row">
+              <div class="dependency-top-row__main">
+                <span class="dependency-top-row__name">{{ row.name }}</span>
+                <span class="dependency-top-row__ecosystem">{{ row.ecosystem_label }}</span>
+              </div>
+              <span class="dependency-top-row__count">{{ row.text }}</span>
+              <div class="dependency-top-row__bar"><span class="dependency-top-row__bar-fill" style="width: {{ row.width }}%"></span></div>
+            </li>
+            {% endfor %}
+          </ol>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="dependency-list__empty">Geen detecteerbare package manager gevonden voor dit project.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="project-detail__section">
+      <h2>Contact</h2>
+      <div class="contact-list" id="contact-list">
+        {% if p.has_contacts %}
+          {% for c in p.contacts %}
+          <div class="contact-card">
+            <p class="contact-card__name">{{ c.name }}</p>
+            {% if c.email %}<p class="contact-card__email"><a href="mailto:{{ c.email }}">{{ c.email }}</a></p>{% endif %}
+            {% if c.affiliation %}<p class="contact-card__affiliation">{{ c.affiliation }}</p>{% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+        <p class="contact-list__empty">Geen contactinformatie beschikbaar.</p>
+        {% endif %}
+      </div>
+    </section>
+  </article>
+</main>
+{% endblock content %}

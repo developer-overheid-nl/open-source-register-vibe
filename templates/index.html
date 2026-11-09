@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block styles %}
+<link rel="stylesheet" href="/static/components/search-bar.css" />
+<link rel="stylesheet" href="/static/components/sort-select.css" />
+<link rel="stylesheet" href="/static/components/tag-filter.css" />
+<link rel="stylesheet" href="/static/components/checkbox-filter.css" />
+<link rel="stylesheet" href="/static/components/project-card.css" />
+<link rel="stylesheet" href="/static/components/commit-sparkline.css" />
+<link rel="stylesheet" href="/static/components/project-list.css" />
+<link rel="stylesheet" href="/static/components/empty-state.css" />
+{% endblock styles %}
+{% block content %}
+<main class="page">
+  <div class="catalog-layout">
+    <aside class="catalog-layout__filters" id="filters">
+      <div class="filters">
+        <section class="filters__section">
+          <h2 class="filters__heading">Softwaretype</h2>
+          <div class="checkbox-filter" id="software-type-filter-options">
+            {% for option in software_types %}
+            <label class="checkbox-filter__option"
+              ><input
+                type="checkbox"
+                class="checkbox-filter__checkbox"
+                value="{{ option.value }}"
+              /><span class="checkbox-filter__label">{{ option.value }}</span></label
+            >
+            {% endfor %}
+          </div>
+        </section>
+        <section class="filters__section">
+          <h2 class="filters__heading">Ontwikkelstatus</h2>
+          <div class="checkbox-filter" id="status-filter-options">
+            {% for option in statuses %}
+            <label class="checkbox-filter__option"
+              ><input
+                type="checkbox"
+                class="checkbox-filter__checkbox"
+                value="{{ option.value }}"
+              /><span class="checkbox-filter__label">{{ option.value }}</span></label
+            >
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="filters__section">
+          <h2 class="filters__heading">Organisatie</h2>
+          <div class="checkbox-filter" id="org-filter-options">
+            {% for option in orgs %}
+            <label class="checkbox-filter__option"
+              ><input
+                type="checkbox"
+                class="checkbox-filter__checkbox"
+                value="{{ option.value }}"
+              /><span class="checkbox-filter__label">{{ option.value }}</span></label
+            >
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="filters__section">
+          <h2 class="filters__heading">Tags</h2>
+          <div class="filters__active-tags" id="active-tag-pills">
+            {% for pill in active_tag_pills %}{% include "partials/tag-pill.html" %}{% endfor %}
+          </div>
+          <div class="tag-filter" id="tag-filter-list">
+            {% for chip in tags %}{% include "partials/tag-chip.html" %}{% endfor %}
+          </div>
+        </section>
+      </div>
+    </aside>
+    <div class="catalog-layout__results">
+      <div class="catalog-toolbar">
+        <div id="search-bar">
+          <div class="search-bar">
+            <label class="search-bar__label" for="search-bar-input">Zoeken</label>
+            <input
+              type="search"
+              id="search-bar-input"
+              class="search-bar__input"
+              placeholder="Zoek op naam, beschrijving of tag…"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        <div id="sort-select">
+          <div class="sort-select">
+            <label class="sort-select__label" for="sort-select-input">Sorteren op</label>
+            <select id="sort-select-input" class="sort-select__input">
+              <option value="name-asc">Naam (A-Z)</option>
+              <option value="commits-desc">Aantal commits (hoog naar laag)</option>
+              <option value="commits-asc">Aantal commits (laag naar hoog)</option>
+              <option value="contributors-desc">Aantal contributors (hoog naar laag)</option>
+              <option value="contributors-asc">Aantal contributors (laag naar hoog)</option>
+              <option value="dependencies-desc">Aantal dependencies (hoog naar laag)</option>
+              <option value="dependencies-asc">Aantal dependencies (laag naar hoog)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="project-list">
+        {% if not cards_empty %}
+        <ul class="project-list" id="project-list-cards">
+          {% for card in cards %}{% include "partials/project-card.html" %}{% endfor %}
+        </ul>
+        {% endif %}
+        <div class="empty-state" id="empty-state"{% if not cards_empty %} hidden{% endif %}>
+          <p class="empty-state__message">Geen projecten gevonden.</p>
+          <p class="empty-state__hint">
+            Probeer een andere zoekterm of pas de actieve filters aan.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock content %}
+{% block scripts %}<script type="module" src="/static/app.js"></script>{% endblock scripts %}

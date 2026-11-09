@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Open Source Catalogus{% endblock title %}</title>
+    <link rel="stylesheet" href="/static/styles/base.css" />
+    {% block styles %}{% endblock styles %}
+    {% block head_extra %}{% endblock head_extra %}
+  </head>
+  <body>
+    <header class="site-header">
+      <a href="/">
+        <p class="site-header__title">Open Source Catalogus</p>
+        <p class="site-header__subtitle">
+          Open source projecten van de Nederlandse overheid
+        </p>
+      </a>
+    </header>
+
+    {% block content %}{% endblock content %}
+
+    {% if updated_at %}
+    <footer class="site-footer">
+      <p class="site-footer__timestamp">Data laatst bijgewerkt: {{ updated_at }}</p>
+    </footer>
+    {% endif %}
+
+    {% block scripts %}{% endblock scripts %}
+  </body>
+</html>
